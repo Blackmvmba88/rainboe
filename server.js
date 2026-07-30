@@ -86,7 +86,7 @@ app.delete('/api/presets/:name', (req, res) => {
 });
 
 // Fallback to index.html for SPA router (if any)
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(webDir, 'index.html'));
 });
 

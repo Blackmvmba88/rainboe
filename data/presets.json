@@ -1,0 +1,38 @@
+{
+  "Original BM-FX": {
+    "speed": 0.55,
+    "lampAngle": 0,
+    "gap1Offset": 0,
+    "gap2Offset": 0,
+    "gaps": 0.16,
+    "diffraction": 1.05,
+    "bloom": 1.2,
+    "dispersion": 0.075,
+    "scale": 1,
+    "sensitivity": 1.8
+  },
+  "Aro Máximo 9:49": {
+    "speed": 2.5,
+    "lampAngle": 0,
+    "gap1Offset": 0,
+    "gap2Offset": 0,
+    "gaps": 0.42,
+    "diffraction": 2,
+    "bloom": 2.4,
+    "dispersion": 0.2,
+    "scale": 1,
+    "sensitivity": 2.35
+  },
+  "Mi configuración permanente": {
+    "speed": 2.5,
+    "lampAngle": 180,
+    "gap1Offset": 180,
+    "gap2Offset": 180,
+    "gaps": 0.42,
+    "diffraction": 2,
+    "bloom": 2.4,
+    "dispersion": 0.2,
+    "scale": 1,
+    "sensitivity": 4
+  }
+}
