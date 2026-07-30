@@ -53,6 +53,23 @@
     .soundcloud-link.visible { display: block; }
     .track-artist { margin-top: 10px; color: #f2ddff; font-size: clamp(10px, 1.3vw, 16px); font-weight: 500;
       letter-spacing: .20em; text-transform: uppercase; text-shadow: 0 0 14px #d267ff99; }
+    .lyrics-line {
+      margin-top: 14px;
+      color: #e5dfffde;
+      font-size: clamp(11px, 1.45vw, 17px);
+      font-weight: 500;
+      line-height: 1.4;
+      letter-spacing: .06em;
+      min-height: 24px;
+      text-shadow: 0 0 12px #c19aff99, 0 0 20px #8247ff44;
+      opacity: 0;
+      transform: translateY(6px) scale(.98);
+      transition: opacity .32s cubic-bezier(.2, .8, .2, 1), transform .32s cubic-bezier(.2, .8, .2, 1);
+    }
+    .lyrics-line.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
     .ui {
       position: fixed; left: max(20px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom));
       width: min(360px, calc(100vw - 40px)); padding: 18px; border: 1px solid #ffffff20;
@@ -151,6 +168,7 @@
     <div class="artist-name" id="trackArtist">IYARI GOMEZ</div>
     <div class="track-title" id="trackTitle"></div>
     <div class="soundcloud-link" id="soundcloudCredit">SoundCloud</div>
+    <div class="lyrics-line" id="lyricsLine"></div>
   </div>
   <section class="ui">
     <div class="head">
@@ -568,6 +586,108 @@
             ? `Canción guardada: “${trackInput.value.trim()}”.`
             : 'Nombre de canción oculto.';
         });
+        let currentLyrics = [];
+        let lastLyricIndex = -1;
+
+        const parseLrc = (lrcText) => {
+          if (!lrcText) return [];
+          const lines = lrcText.split('\n');
+          const lrcArray = [];
+          const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+          
+          for (let line of lines) {
+            const match = timeRegex.exec(line);
+            if (match) {
+              const minutes = parseInt(match[1], 10);
+              const seconds = parseFloat(match[2]);
+              const time = minutes * 60 + seconds;
+              const text = line.replace(timeRegex, '').trim();
+              lrcArray.push({ time, text });
+            }
+          }
+          return lrcArray.sort((a, b) => a.time - b.time);
+        };
+
+        const updateLyrics = (currentTime, duration) => {
+          if (!currentLyrics || currentLyrics.length === 0) return;
+          const lyricsEl = document.querySelector('#lyricsLine');
+          
+          if (currentLyrics[0].time >= 0) {
+            let activeIndex = -1;
+            for (let i = 0; i < currentLyrics.length; i++) {
+              if (currentTime >= currentLyrics[i].time) {
+                activeIndex = i;
+              } else {
+                break;
+              }
+            }
+            
+            if (activeIndex !== lastLyricIndex) {
+              lastLyricIndex = activeIndex;
+              const text = activeIndex >= 0 ? currentLyrics[activeIndex].text : '';
+              
+              lyricsEl.classList.remove('visible');
+              setTimeout(() => {
+                lyricsEl.textContent = text;
+                if (text) lyricsEl.classList.add('visible');
+              }, 140);
+            }
+          } else if (duration > 0) {
+            const lineDuration = duration / currentLyrics.length;
+            let activeIndex = Math.floor(currentTime / lineDuration);
+            activeIndex = Math.max(0, Math.min(currentLyrics.length - 1, activeIndex));
+            
+            if (activeIndex !== lastLyricIndex) {
+              lastLyricIndex = activeIndex;
+              const text = currentLyrics[activeIndex].text;
+              
+              lyricsEl.classList.remove('visible');
+              setTimeout(() => {
+                lyricsEl.textContent = text;
+                if (text) lyricsEl.classList.add('visible');
+              }, 140);
+            }
+          }
+        };
+
+        const fetchLyrics = async (artist, title) => {
+          currentLyrics = [];
+          lastLyricIndex = -1;
+          const lyricsEl = document.querySelector('#lyricsLine');
+          lyricsEl.textContent = '';
+          lyricsEl.classList.remove('visible');
+          
+          if (!artist || !title || artist.toLowerCase() === 'iyari gomez') return;
+          
+          const cleanString = (str) => {
+            return str
+              .replace(/\(feat\..*?\)/gi, '')
+              .replace(/feat\..*/gi, '')
+              .replace(/\(.*?\)/g, '')
+              .replace(/\[.*?\]/g, '')
+              .trim();
+          };
+          
+          const cleanArtist = cleanString(artist);
+          const cleanTitle = cleanString(title);
+          
+          try {
+            const url = `https://lrclib.net/api/get?artist=${encodeURIComponent(cleanArtist)}&track=${encodeURIComponent(cleanTitle)}`;
+            const response = await fetch(url);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.syncedLyrics) {
+                currentLyrics = parseLrc(data.syncedLyrics);
+              } else if (data.plainLyrics) {
+                const lines = data.plainLyrics.split('\n').filter(l => l.trim() !== '');
+                currentLyrics = lines.map(text => ({ time: -1, text: text.trim() }));
+              }
+            }
+          } catch (e) {
+            console.log('Error al sincronizar letra con LRCLIB:', e);
+          }
+        };
+
         let scWidget = null, currentSoundId = null, soundPoll = null, playbackProgress = 0;
         let playbackMode = 'independent';
         const applySound = (sound, source = 'internal') => {
@@ -580,6 +700,7 @@
           currentSoundId = nextSoundId;
           const creator = String(sound.user?.username || sound.publisher_metadata?.artist || '').trim();
           const song = String(sound.title || '').trim();
+          fetchLyrics(creator, song);
           trackArtist.textContent = creator || 'IYARI GOMEZ';
           if (song) {
             trackInput.value = song;
@@ -636,6 +757,10 @@
             permalink_url: track.url,
             progress: track.progress
           }, 'watchdog');
+          if (track && Number.isFinite(track.progress)) {
+            const dur = Number.isFinite(track.duration) ? track.duration / 1000 : 200;
+            updateLyrics(track.progress * dur, dur);
+          }
           soundcloudUrl.value = track.url || soundcloudUrl.value;
           soundcloudCredit.textContent = track.playing === false ? 'SoundCloud · Pausado' : 'SoundCloud · En reproducción';
           micStatus.textContent = `Watchdog: “${track.title}”${track.artist ? ` de ${track.artist}` : ''}.`;
@@ -670,6 +795,9 @@
             scWidget.bind(window.SC.Widget.Events.FINISH, updateAfterTransition);
             scWidget.bind(window.SC.Widget.Events.PLAY_PROGRESS, event => {
               if (Number.isFinite(event?.relativePosition)) playbackProgress = event.relativePosition;
+              if (event && Number.isFinite(event.currentPosition)) {
+                updateLyrics(event.currentPosition / 1000, event.duration / 1000);
+              }
             });
             clearInterval(soundPoll);
             soundPoll = setInterval(updateCurrent, 1200);
