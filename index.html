@@ -242,6 +242,7 @@
       float theta = atan(p.y, p.x);
       float t = uTime * uSpeed;
       float rhythm = uRhythmPhase;
+      
       float lampAngle = t * 0.28 + rhythm * 1.35 + uBeat * 0.18 + uLampOffset;
       float gap1 = -1.25 + uGap1Offset + t * 0.06 + rhythm * 0.72 + uBeat * 0.22;
       float gap2 =  2.15 + uGap2Offset - t * 0.04 - rhythm * 0.54 - uBeat * 0.16;
@@ -250,45 +251,78 @@
       // spectrum × ring geometry × gap masks × angular lamp × diffraction
       float audioPulse = uBass * 0.045;
       float radial = abs(radius - (0.62 + audioPulse));
-      float coreRing = 1.0 - smoothstep(0.017, 0.032, radial);
-      float glassRing = 1.0 - smoothstep(0.025, 0.072, radial);
-      float bloomRing = exp(-radial * radial / mix(0.004, 0.016, clamp(uBloom / 2.4, 0.0, 1.0)));
+      
+      // Glass Ring Refrac & Chromatic Aberration
+      float distToRing = abs(radius - (0.62 + audioPulse));
+      float refractFactor = 0.042 * (1.0 + uBass * 1.25) * exp(-distToRing * distToRing / 0.006);
+      
+      // Calculate three separate refraction vectors for Red, Green, and Blue dispersion
+      float dispAmount = uDispersion * 0.12 * exp(-distToRing * distToRing / 0.006);
+      vec2 refractedPR = p - normalize(p) * sin(distToRing * 25.0) * (refractFactor + dispAmount);
+      vec2 refractedPG = p - normalize(p) * sin(distToRing * 25.0) * refractFactor;
+      vec2 refractedPB = p - normalize(p) * sin(distToRing * 25.0) * (refractFactor - dispAmount);
+      
+      float radiusRefract = length(refractedPG);
+      float thetaRefract = atan(refractedPG.y, refractedPG.x);
+      
+      float coreRing = 1.0 - smoothstep(0.016, 0.028, radial);
+      float glassRing = 1.0 - smoothstep(0.022, 0.065, radial);
+      float bloomRing = exp(-radial * radial / mix(0.003, 0.020, clamp((uBloom + uBeat * 0.5) / 2.9, 0.0, 1.0)));
 
       float gapMask = gap(theta, gap1, liveGap) * gap(theta, gap2, liveGap * 0.78);
       float lamp = gaussian(angularDistance(theta, lampAngle), 0.30);
       float lampEcho = gaussian(angularDistance(theta, lampAngle + PI), 0.82) * 0.15;
 
-      float edge1 = gaussian(angularDistance(theta, gap1 - liveGap), 0.055)
-                  + gaussian(angularDistance(theta, gap1 + liveGap), 0.055);
-      float edge2 = gaussian(angularDistance(theta, gap2 - liveGap*.78), 0.045)
-                  + gaussian(angularDistance(theta, gap2 + liveGap*.78), 0.045);
-      float interference = 0.72 + 0.28 * sin(theta * 31.0 - t * 2.4 + radial * 210.0);
-      float diffraction = (uDiffraction + uTreble * 1.6) * (edge1 + edge2 * 0.82) * (0.5 + 0.5 * interference);
+      // Fine acoustic edge diffraction
+      float edge1 = gaussian(angularDistance(theta, gap1 - liveGap), 0.048)
+                  + gaussian(angularDistance(theta, gap1 + liveGap), 0.048);
+      float edge2 = gaussian(angularDistance(theta, gap2 - liveGap*.78), 0.040)
+                  + gaussian(angularDistance(theta, gap2 + liveGap*.78), 0.040);
+      
+      // Multiple harmonic interference fringes (acoustic waves splitting light)
+      float interference = 0.5 
+                         + 0.30 * sin(theta * 37.0 - t * 3.1 + radial * 240.0) 
+                         + 0.20 * sin(theta * 74.0 + t * 1.5 - radial * 120.0);
+      float diffraction = (uDiffraction + uTreble * 2.2) * (edge1 + edge2 * 0.85) * (0.4 + 0.6 * interference);
 
-      vec3 spectrum = spectralRGB(theta * 1.55 - lampAngle * 0.8 + radial * 17.0, (uDispersion + uTreble * 0.055) * 5.0);
-      float light = 0.14 + lamp * (2.3 + uAudioLevel * 2.0) + lampEcho + diffraction * 1.7;
-      vec3 halo = spectrum * gapMask * light * (coreRing * 1.65 + glassRing * 0.48 + bloomRing * (uBloom + uAudioLevel * 1.7) * 0.20);
+      vec3 spectrum = spectralRGB(theta * 1.55 - lampAngle * 0.8 + radial * 19.0, (uDispersion + uTreble * 0.065) * 5.0);
+      float light = 0.12 + lamp * (2.4 + uAudioLevel * 2.2 + uBeat * 0.8) + lampEcho + diffraction * 1.8;
+      vec3 halo = spectrum * gapMask * light * (coreRing * 1.65 + glassRing * 0.48 + bloomRing * (uBloom + uAudioLevel * 1.75) * 0.22);
 
       float glint = gaussian(angularDistance(theta, lampAngle), 0.075)
                   * gaussian(radial, 0.010) * 3.8;
       halo += vec3(0.82, 0.93, 1.0) * glint * gapMask;
 
-      // Circular timeline: 12 hour marks, 60 minute marks, played arc and playhead.
-      float clockPos = fract((theta + PI * 0.5 + TAU) / TAU);
+      // Circular timeline (warped through the glass ring refraction)
+      float thetaR = atan(refractedPR.y, refractedPR.x);
+      float thetaG = thetaRefract;
+      float thetaB = atan(refractedPB.y, refractedPB.x);
+      
+      float clockPos = fract((thetaG + PI * 0.5 + TAU) / TAU);
       float minuteTick = pow(abs(cos(clockPos * PI * 60.0)), 34.0);
       float hourTick = pow(abs(cos(clockPos * PI * 12.0)), 48.0);
-      float minuteBand = 1.0 - smoothstep(0.011, 0.020, abs(radius - 0.675));
-      float hourBand = 1.0 - smoothstep(0.012, 0.040, abs(radius - 0.665));
+      
+      // Evaluate rings using RGB refraction
+      float minuteBand = 1.0 - smoothstep(0.011, 0.020, abs(radiusRefract - 0.675));
+      float hourBand = 1.0 - smoothstep(0.012, 0.040, abs(radiusRefract - 0.665));
       float played = 1.0 - smoothstep(uProgress, min(1.0, uProgress + 0.012), clockPos);
+      
       vec3 timelineColor = mix(vec3(0.10, 0.14, 0.20), spectrum * 1.55 + 0.25, played);
       halo += timelineColor * gapMask * (minuteTick * minuteBand * 0.85 + hourTick * hourBand * 1.55);
-      float timelineTrack = 1.0 - smoothstep(0.006, 0.012, abs(radius - 0.704));
+      
+      // Chromatic dispersion split on the timeline track line
+      float trackR = 1.0 - smoothstep(0.006, 0.012, abs(length(refractedPR) - 0.704));
+      float trackG = 1.0 - smoothstep(0.006, 0.012, abs(radiusRefract - 0.704));
+      float trackB = 1.0 - smoothstep(0.006, 0.012, abs(length(refractedPB) - 0.704));
+      vec3 timelineTrack = vec3(trackR, trackG, trackB);
+      
       vec3 playedColor = mix(vec3(0.35, 0.82, 1.0), spectrum * 1.85 + 0.35, 0.62);
       halo += timelineTrack * vec3(0.035, 0.050, 0.075);
       halo += timelineTrack * played * playedColor * (1.35 + uAudioLevel * 0.45);
+      
       float playheadAngle = uProgress * TAU - PI * 0.5;
-      float playhead = gaussian(angularDistance(theta, playheadAngle), 0.018)
-                     * (1.0 - smoothstep(0.010, 0.033, abs(radius - 0.704)));
+      float playhead = gaussian(angularDistance(thetaRefract, playheadAngle), 0.018)
+                     * (1.0 - smoothstep(0.010, 0.033, abs(radiusRefract - 0.704)));
       halo += vec3(0.90, 0.97, 1.0) * playhead * (1.8 + uAudioLevel);
 
       float shell = (1.0 - smoothstep(0.54, 0.57, radius)) * smoothstep(0.18, 0.56, radius);
