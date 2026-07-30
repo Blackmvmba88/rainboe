@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BM-FX-001 — Spectral Halo v0.2</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; overflow: hidden; background: #020306; color: #eef2ff; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    .artist {
+      --audio: 0; --treble: 0;
+      position: fixed; z-index: 1; left: 50%; top: 50%; width: min(58vmin, 680px); transform: translate(-50%, -50%);
+      text-align: center; pointer-events: none; isolation: isolate;
+    }
+    .artist::after {
+      content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: min(58vmin, 680px); aspect-ratio: 1;
+      transform: translate(-50%, -50%); border-radius: 50%;
+      background: radial-gradient(circle, #02050a2c 0 22%, #05081068 58%, #020306b0 100%);
+    }
+    .artwork {
+      display: none; position: absolute; z-index: -2; left: 50%; top: 50%; width: min(58vmin, 680px); aspect-ratio: 1;
+      border-radius: 50%; object-fit: cover; opacity: .72;
+      box-shadow: inset 0 0 0 2px #ffffff18, 0 0 calc(24px + var(--audio) * 34px) #c062ff66;
+      filter: saturate(1.25) brightness(calc(.62 + var(--audio) * .30));
+      animation: vinyl-spin 18s linear infinite;
+    }
+    .artwork[src] { display: block; }
+    @keyframes vinyl-spin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    .artist-name {
+      position: relative; display: inline-block; margin: 0; padding: .12em .18em;
+      font-size: clamp(15px, 2.2vw, 32px); font-weight: 300; line-height: .9; letter-spacing: .16em;
+      color: transparent; background: linear-gradient(105deg, #65eaff 4%, #ece9ff 22%, #ff7ad9 40%, #fff18a 59%, #62ffd2 76%, #8f85ff 96%);
+      background-size: 230% 100%; background-position: calc(50% + var(--treble) * 45%) 50%;
+      -webkit-background-clip: text; background-clip: text;
+      filter: brightness(calc(1 + var(--audio) * .9)) saturate(calc(1.05 + var(--treble) * .8));
+      text-shadow: 0 0 calc(8px + var(--audio) * 22px) #b873ff88;
+      transform: scale(calc(1 + var(--audio) * .045));
+      transition: transform 60ms linear, filter 60ms linear;
+    }
+    .artist-name::before {
+      content: attr(data-text); position: absolute; inset: 0; z-index: -1; color: transparent;
+      -webkit-text-stroke: .35px #c9e9ff55; filter: blur(calc(4px + var(--audio) * 7px));
+      text-shadow: -8px 0 20px #29dfff88, 8px 0 20px #ff3fa788, 0 6px 24px #fff07b66;
+    }
+    .track-title { margin-top: 11px; color: #dce7f6cc; font-size: clamp(9px, 1.15vw, 14px); font-weight: 400;
+      letter-spacing: .18em; text-transform: uppercase; text-shadow: 0 0 14px #62dfff88; }
+    .soundcloud-link { display: none; margin-top: 8px; color: #ff8a53aa; font-size: 8px; letter-spacing: .16em; text-transform: uppercase; }
+    .soundcloud-link.visible { display: block; }
+    .track-artist { margin-top: 10px; color: #f2ddff; font-size: clamp(10px, 1.3vw, 16px); font-weight: 500;
+      letter-spacing: .20em; text-transform: uppercase; text-shadow: 0 0 14px #d267ff99; }
+    .ui {
+      position: fixed; left: max(20px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom));
+      width: min(360px, calc(100vw - 40px)); padding: 18px; border: 1px solid #ffffff20;
+      border-radius: 20px; background: #080a10bf; box-shadow: 0 18px 60px #000a;
+      backdrop-filter: blur(18px) saturate(130%); transition: opacity .25s ease, transform .3s cubic-bezier(.2,.8,.2,1);
+      max-height: calc(100vh - 40px); overflow-y: auto; scrollbar-width: thin;
+    }
+    .ui.hidden { opacity: 0; transform: translateY(24px) scale(.96); pointer-events: none; }
+    .panel-toggle {
+      position: fixed; z-index: 2; left: max(20px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom));
+      width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid #ffffff22; border-radius: 50%;
+      color: #eef2ff; background: #090c14c9; box-shadow: 0 10px 35px #0009; backdrop-filter: blur(14px);
+      cursor: pointer; opacity: 0; transform: scale(.7); pointer-events: none; transition: .25s ease;
+    }
+    .panel-toggle.visible { opacity: 1; transform: scale(1); pointer-events: auto; }
+    .panel-toggle:hover { border-color: #b9a5ff88; box-shadow: 0 10px 35px #0009, 0 0 20px #8e62ff33; }
+    .hide-panel { border: 0; padding: 3px 5px; color: #8f99ad; background: transparent; cursor: pointer; font-size: 17px; line-height: 1; }
+    .head { display: flex; align-items: start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+    h1 { margin: 0; font-size: 14px; letter-spacing: .13em; text-transform: uppercase; }
+    .version { margin-top: 5px; color: #8e96a8; font-size: 11px; letter-spacing: .08em; }
+    .perf { padding: 7px 9px; border: 1px solid #ffffff18; border-radius: 10px; color: #aeb7c9;
+      font: 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+    .control { display: grid; grid-template-columns: 98px 1fr 46px; align-items: center; gap: 10px; margin-top: 10px; }
+    label { color: #c8cede; font-size: 11px; }
+    output { color: #8f9bb1; font: 10px ui-monospace, monospace; text-align: right; }
+    input[type=range] { width: 100%; accent-color: #b6c5ff; }
+    .mic {
+      width: 100%; margin-top: 14px; padding: 11px 13px; border: 1px solid #ffffff22; border-radius: 12px;
+      color: #eef2ff; background: linear-gradient(110deg, #332173, #125b70); font: 700 11px/1 system-ui;
+      letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+    }
+    .mic[data-active="true"] { background: linear-gradient(110deg, #713461, #128069); box-shadow: 0 0 24px #33ffc733; }
+    .meter { height: 3px; margin-top: 9px; border-radius: 2px; overflow: hidden; background: #ffffff12; }
+    .meter i { display: block; width: 0%; height: 100%; background: linear-gradient(90deg, #42d9ff, #c75cff, #fff275); transition: width 50ms linear; }
+    .presets { display: grid; grid-template-columns: 1fr auto; gap: 7px; margin-top: 14px; }
+    .presets input, .presets select, .preset-button {
+      min-width: 0; height: 34px; border: 1px solid #ffffff18; border-radius: 9px; color: #dfe5f3;
+      background: #ffffff09; padding: 0 10px; font: 10px system-ui;
+    }
+    .preset-button { cursor: pointer; font-weight: 700; letter-spacing: .04em; }
+    .preset-button:hover { border-color: #9f90ff66; background: #8f74ff18; }
+    .preset-row { display: grid; grid-template-columns: 1fr auto auto; gap: 7px; grid-column: 1 / -1; }
+    .name-editor { display: grid; grid-template-columns: 98px 1fr auto; align-items: center; gap: 10px; margin-top: 12px; }
+    .name-editor label { color: #c8cede; font-size: 11px; }
+    .name-editor input { width: 100%; height: 34px; border: 1px solid #ffffff18; border-radius: 9px; color: #eef2ff;
+      background: #ffffff09; padding: 0 10px; font: 11px system-ui; }
+    .symbol-palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin: 7px 0 0 108px; }
+    .symbol-palette button { height: 27px; padding: 0; border: 1px solid #ffffff16; border-radius: 7px; color: #dce5f6;
+      background: #ffffff08; cursor: pointer; font-size: 14px; }
+    .symbol-palette button:hover { color: #fff; border-color: #ad8dff77; background: #936aff20; text-shadow: 0 0 9px #b46cff; }
+    .name-toggle { position: relative; width: 48px; height: 26px; display: block; cursor: pointer; }
+    .name-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+    .name-toggle span { position: absolute; inset: 0; border: 1px solid #ffffff20; border-radius: 99px; background: #ffffff0c; transition: .22s ease; }
+    .name-toggle span::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+      border-radius: 50%; background: #6c7485; transition: .22s ease; }
+    .name-toggle span::after { content: "OFF"; position: absolute; right: 5px; top: 8px; color: #7e8798; font: 7px/1 system-ui; }
+    .name-toggle input:checked + span { background: linear-gradient(100deg, #633885, #087f72); box-shadow: 0 0 16px #43ffe03b; }
+    .name-toggle input:checked + span::before { left: 25px; background: #e9fffb; }
+    .name-toggle input:checked + span::after { content: "ON"; left: 6px; right: auto; color: #dffff8; }
+    .soundcloud-editor { display: grid; grid-template-columns: 98px 1fr auto; align-items: center; gap: 10px; margin-top: 9px; }
+    .soundcloud-editor label { color: #c8cede; font-size: 11px; }
+    .soundcloud-editor input { min-width: 0; height: 34px; border: 1px solid #ffffff18; border-radius: 9px; color: #eef2ff;
+      background: #ffffff09; padding: 0 10px; font: 10px system-ui; }
+    .watchdog-state { grid-column: 2 / -1; color: #ff7b7b; font: 700 9px/1.3 ui-monospace, monospace; letter-spacing: .08em; }
+    .watchdog-state.online { color: #67ffd3; text-shadow: 0 0 10px #45ffc866; }
+    .mode-editor { display: grid; grid-template-columns: 98px 1fr; align-items: center; gap: 10px; margin-top: 12px; }
+    .mode-editor label { color: #c8cede; font-size: 11px; }
+    .mode-editor select { height: 34px; border: 1px solid #ffffff18; border-radius: 9px; color: #eef2ff;
+      background: #111522; padding: 0 10px; font: 700 10px system-ui; }
+    .shader-controls { margin-top: 4px; }
+    .shader-controls summary { padding: 9px 10px; border: 1px solid #ffffff18; border-radius: 10px; color: #cbd3e4;
+      background: #ffffff08; cursor: pointer; font: 700 10px system-ui; letter-spacing: .08em; text-transform: uppercase; }
+    .shader-controls[open] summary { margin-bottom: 4px; }
+    .soundcloud-editor.sync-mode input, .soundcloud-editor.sync-mode button { opacity: .38; pointer-events: none; }
+    .sc-player { display: none; margin-top: 9px; overflow: hidden; border: 1px solid #ffffff18; border-radius: 12px; background: #05070b; }
+    .sc-player.visible { display: block; }
+    .sc-player iframe { display: block; width: 100%; height: 82px; border: 0; }
+    .sc-transport { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 6px; padding: 7px; }
+    .sc-transport button { height: 31px; border: 1px solid #ffffff18; border-radius: 8px; color: #eef2ff;
+      background: #ffffff09; cursor: pointer; font-size: 12px; }
+    .sc-transport button:hover { background: #ff6b351c; border-color: #ff925866; }
+    .hint { margin: 14px 0 0; color: #687186; font-size: 10px; line-height: 1.5; }
+    .fallback {
+      display: none; position: fixed; inset: 0; place-items: center; padding: 30px; text-align: center;
+      background: radial-gradient(circle, #281548 0, #090b13 50%, #020306 100%);
+    }
+    .fallback strong { display: block; margin-bottom: 8px; font-size: 19px; }
+    .fallback span { color: #adb4c4; max-width: 440px; display: block; line-height: 1.55; }
+    @media (max-height: 650px) { .ui { max-height: calc(100vh - 24px); overflow: auto; bottom: 12px; } }
+  </style>
+</head>
+<body>
+  <canvas id="gl" aria-label="Halo espectral WebGL animado"></canvas>
+  <div class="artist" id="artist" aria-label="IYARI GOMEZ">
+    <img class="artwork" id="artwork" alt="">
+    <div class="artist-name" id="trackArtist">IYARI GOMEZ</div>
+    <div class="track-title" id="trackTitle"></div>
+    <div class="soundcloud-link" id="soundcloudCredit">SoundCloud</div>
+  </div>
+  <section class="ui">
+    <div class="head">
+      <div><h1>BM-FX-001</h1><div class="version">SPECTRAL HALO · v0.2 GLSL</div></div>
+      <div style="display:flex;align-items:start;gap:6px"><div class="perf" id="perf">-- FPS<br>scale --</div><button class="hide-panel" id="hidePanel" type="button" title="Ocultar controles" aria-label="Ocultar controles">×</button></div>
+    </div>
+    <details class="shader-controls" open>
+      <summary>Shader y movimiento</summary>
+    <div class="control"><label for="speed">Velocidad</label><input id="speed" type="range" min="0" max="2.5" step=".01" value=".55"><output>.55×</output></div>
+    <div class="control"><label for="lampAngle">Posición luz</label><input id="lampAngle" type="range" min="-180" max="180" step="1" value="0"><output>0°</output></div>
+    <div class="control"><label for="gap1Offset">Posición hueco 1</label><input id="gap1Offset" type="range" min="-180" max="180" step="1" value="0"><output>0°</output></div>
+    <div class="control"><label for="gap2Offset">Posición hueco 2</label><input id="gap2Offset" type="range" min="-180" max="180" step="1" value="0"><output>0°</output></div>
+    <div class="control"><label for="gaps">Huecos</label><input id="gaps" type="range" min=".03" max=".42" step=".005" value=".16"><output>.16</output></div>
+    <div class="control"><label for="diffraction">Difracción</label><input id="diffraction" type="range" min="0" max="2" step=".01" value="1.05"><output>1.05</output></div>
+    <div class="control"><label for="bloom">Bloom</label><input id="bloom" type="range" min="0" max="2.4" step=".01" value="1.20"><output>1.20</output></div>
+    <div class="control"><label for="dispersion">Separación RGB</label><input id="dispersion" type="range" min="0" max=".20" step=".002" value=".075"><output>.075</output></div>
+    <div class="control"><label for="scale">Render scale</label><input id="scale" type="range" min=".5" max="1" step=".05" value="1"><output>1.00</output></div>
+    <div class="control"><label for="sensitivity">Sensibilidad</label><input id="sensitivity" type="range" min=".4" max="4" step=".05" value="1.8"><output>1.80</output></div>
+    </details>
+    <div class="name-editor">
+      <label for="trackInput">Canción</label>
+      <input id="trackInput" type="text" maxlength="60" placeholder="Nombre de la canción" autocomplete="off">
+      <span></span>
+    </div>
+    <div class="mode-editor">
+      <label for="playbackMode">Modo musical</label>
+      <select id="playbackMode">
+        <option value="independent">Independiente · reproductor BM-FX</option>
+        <option value="sync">Sincronizado · pestaña externa</option>
+      </select>
+    </div>
+    <div class="soundcloud-editor">
+      <label for="soundcloudUrl">SoundCloud</label>
+      <input id="soundcloudUrl" type="url" placeholder="Pega el enlace de la canción">
+      <button class="preset-button" id="loadSoundcloud" type="button">Mostrar</button>
+      <div class="watchdog-state" id="watchdogState">WATCHDOG OFF · Sin datos de la pestaña externa</div>
+    </div>
+    <div class="sc-player" id="scPlayer">
+      <iframe id="scWidget" title="Reproductor de SoundCloud" allow="autoplay"></iframe>
+      <div class="sc-transport">
+        <button id="scPrev" type="button" aria-label="Canción anterior">◀◀</button>
+        <button id="scToggle" type="button" aria-label="Reproducir o pausar">▶ / ❚❚</button>
+        <button id="scNext" type="button" aria-label="Canción siguiente">▶▶</button>
+      </div>
+    </div>
+    <div class="presets">
+      <input id="presetName" type="text" maxlength="32" placeholder="Nombre del preset" aria-label="Nombre del preset">
+      <button class="preset-button" id="savePreset" type="button">Guardar</button>
+      <div class="preset-row">
+        <select id="presetSelect" aria-label="Presets guardados"><option value="">Presets guardados</option></select>
+        <button class="preset-button" id="loadPreset" type="button">Cargar</button>
+        <button class="preset-button" id="deletePreset" type="button" title="Eliminar preset">×</button>
+      </div>
+    </div>
+    <button class="mic" id="mic" type="button" data-active="false">Activar micrófono</button>
+    <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+    <p class="hint" id="micStatus">Arrastra sobre el halo para orientar la lámpara. Doble clic restaura los valores.</p>
+  </section>
+  <button class="panel-toggle" id="showPanel" type="button" title="Mostrar controles" aria-label="Mostrar controles">☰</button>
+  <div class="fallback" id="fallback"><div><strong>WebGL no está disponible</strong><span>BM-FX-001 v0.2 necesita aceleración WebGL. Actívala en el navegador o abre este archivo en una versión reciente de Chrome, Safari, Edge o Firefox.</span></div></div>
+
+  <script id="vertex" type="x-shader/x-vertex">
+    attribute vec2 aPosition;
+    void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
+  </script>
+  <script id="fragment" type="x-shader/x-fragment">
+    precision highp float;
+    uniform vec2 uResolution;
+    uniform float uTime, uSpeed, uGaps, uDiffraction, uBloom, uDispersion, uLampOffset, uGap1Offset, uGap2Offset;
+    uniform float uAudioLevel, uBass, uTreble, uBeat, uRhythmPhase, uProgress;
+
+    const float PI = 3.14159265359;
+    const float TAU = 6.28318530718;
+
+    float angularDistance(float a, float b) { return abs(atan(sin(a-b), cos(a-b))); }
+    float gaussian(float x, float width) { return exp(-0.5 * x*x / max(width*width, 0.0001)); }
+    float gap(float theta, float center, float width) {
+      return smoothstep(width * 0.42, width, angularDistance(theta, center));
+    }
+    vec3 spectralRGB(float phase, float spread) {
+      vec3 offsets = vec3(-spread, 0.0, spread);
+      vec3 waves = 0.5 + 0.5 * cos(phase + offsets * TAU + vec3(0.0, 2.094, 4.189));
+      return pow(waves, vec3(1.35)) * 1.18 + 0.08;
+    }
+
+    void main() {
+      vec2 p = (2.0 * gl_FragCoord.xy - uResolution.xy) / min(uResolution.x, uResolution.y);
+      float radius = length(p);
+      float theta = atan(p.y, p.x);
+      float t = uTime * uSpeed;
+      float rhythm = uRhythmPhase;
+      
+      float lampAngle = t * 0.28 + rhythm * 1.35 + uBeat * 0.18 + uLampOffset;
+      float gap1 = -1.25 + uGap1Offset + t * 0.06 + rhythm * 0.72 + uBeat * 0.22;
+      float gap2 =  2.15 + uGap2Offset - t * 0.04 - rhythm * 0.54 - uBeat * 0.16;
+      float liveGap = uGaps * (1.0 + uBeat * 0.72 + uBass * 0.20);
+
+      // spectrum × ring geometry × gap masks × angular lamp × diffraction
+      float audioPulse = uBass * 0.045;
+      float radial = abs(radius - (0.62 + audioPulse));
+      
+      // Glass Ring Refrac & Chromatic Aberration
+      float distToRing = abs(radius - (0.62 + audioPulse));
+      float refractFactor = 0.042 * (1.0 + uBass * 1.25) * exp(-distToRing * distToRing / 0.006);
+      
+      // Calculate three separate refraction vectors for Red, Green, and Blue dispersion
+      float dispAmount = uDispersion * 0.12 * exp(-distToRing * distToRing / 0.006);
+      vec2 refractedPR = p - normalize(p) * sin(distToRing * 25.0) * (refractFactor + dispAmount);
+      vec2 refractedPG = p - normalize(p) * sin(distToRing * 25.0) * refractFactor;
+      vec2 refractedPB = p - normalize(p) * sin(distToRing * 25.0) * (refractFactor - dispAmount);
+      
+      float radiusRefract = length(refractedPG);
+      float thetaRefract = atan(refractedPG.y, refractedPG.x);
+      
+      float coreRing = 1.0 - smoothstep(0.016, 0.028, radial);
+      float glassRing = 1.0 - smoothstep(0.022, 0.065, radial);
+      float bloomRing = exp(-radial * radial / mix(0.003, 0.020, clamp((uBloom + uBeat * 0.5) / 2.9, 0.0, 1.0)));
+
+      float gapMask = gap(theta, gap1, liveGap) * gap(theta, gap2, liveGap * 0.78);
+      float lamp = gaussian(angularDistance(theta, lampAngle), 0.30);
+      float lampEcho = gaussian(angularDistance(theta, lampAngle + PI), 0.82) * 0.15;
+
+      // Fine acoustic edge diffraction
+      float edge1 = gaussian(angularDistance(theta, gap1 - liveGap), 0.048)
+                  + gaussian(angularDistance(theta, gap1 + liveGap), 0.048);
+      float edge2 = gaussian(angularDistance(theta, gap2 - liveGap*.78), 0.040)
+                  + gaussian(angularDistance(theta, gap2 + liveGap*.78), 0.040);
+      
+      // Multiple harmonic interference fringes (acoustic waves splitting light)
+      float interference = 0.5 
+                         + 0.30 * sin(theta * 37.0 - t * 3.1 + radial * 240.0) 
+                         + 0.20 * sin(theta * 74.0 + t * 1.5 - radial * 120.0);
+      float diffraction = (uDiffraction + uTreble * 2.2) * (edge1 + edge2 * 0.85) * (0.4 + 0.6 * interference);
+
+      vec3 spectrum = spectralRGB(theta * 1.55 - lampAngle * 0.8 + radial * 19.0, (uDispersion + uTreble * 0.065) * 5.0);
+      float light = 0.12 + lamp * (2.4 + uAudioLevel * 2.2 + uBeat * 0.8) + lampEcho + diffraction * 1.8;
+      vec3 halo = spectrum * gapMask * light * (coreRing * 1.65 + glassRing * 0.48 + bloomRing * (uBloom + uAudioLevel * 1.75) * 0.22);
+
+      float glint = gaussian(angularDistance(theta, lampAngle), 0.075)
+                  * gaussian(radial, 0.010) * 3.8;
+      halo += vec3(0.82, 0.93, 1.0) * glint * gapMask;
+
+      // Circular timeline (warped through the glass ring refraction)
+      float thetaR = atan(refractedPR.y, refractedPR.x);
+      float thetaG = thetaRefract;
+      float thetaB = atan(refractedPB.y, refractedPB.x);
+      
+      float clockPos = fract((thetaG + PI * 0.5 + TAU) / TAU);
+      float minuteTick = pow(abs(cos(clockPos * PI * 60.0)), 34.0);
+      float hourTick = pow(abs(cos(clockPos * PI * 12.0)), 48.0);
+      
+      // Evaluate rings using RGB refraction
+      float minuteBand = 1.0 - smoothstep(0.011, 0.020, abs(radiusRefract - 0.675));
+      float hourBand = 1.0 - smoothstep(0.012, 0.040, abs(radiusRefract - 0.665));
+      float played = 1.0 - smoothstep(uProgress, min(1.0, uProgress + 0.012), clockPos);
+      
+      vec3 timelineColor = mix(vec3(0.10, 0.14, 0.20), spectrum * 1.55 + 0.25, played);
+      halo += timelineColor * gapMask * (minuteTick * minuteBand * 0.85 + hourTick * hourBand * 1.55);
+      
+      // Chromatic dispersion split on the timeline track line
+      float trackR = 1.0 - smoothstep(0.006, 0.012, abs(length(refractedPR) - 0.704));
+      float trackG = 1.0 - smoothstep(0.006, 0.012, abs(radiusRefract - 0.704));
+      float trackB = 1.0 - smoothstep(0.006, 0.012, abs(length(refractedPB) - 0.704));
+      vec3 timelineTrack = vec3(trackR, trackG, trackB);
+      
+      vec3 playedColor = mix(vec3(0.35, 0.82, 1.0), spectrum * 1.85 + 0.35, 0.62);
+      halo += timelineTrack * vec3(0.035, 0.050, 0.075);
+      halo += timelineTrack * played * playedColor * (1.35 + uAudioLevel * 0.45);
+      
+      float playheadAngle = uProgress * TAU - PI * 0.5;
+      float playhead = gaussian(angularDistance(thetaRefract, playheadAngle), 0.018)
+                     * (1.0 - smoothstep(0.010, 0.033, abs(radiusRefract - 0.704)));
+      halo += vec3(0.90, 0.97, 1.0) * playhead * (1.8 + uAudioLevel);
+
+      float shell = (1.0 - smoothstep(0.54, 0.57, radius)) * smoothstep(0.18, 0.56, radius);
+      vec3 metal = vec3(0.012, 0.016, 0.023) + shell * (0.035 + 0.025 * max(p.y, 0.0));
+      float button = 1.0 - smoothstep(0.46, 0.475, radius);
+      metal += button * vec3(0.010, 0.013, 0.018);
+      float vignette = 1.0 - smoothstep(0.55, 1.45, length(p));
+      vec3 color = metal + halo;
+      color *= 0.45 + 0.55 * vignette;
+      color = 1.0 - exp(-color * 1.3);
+      color = pow(color, vec3(0.90));
+      gl_FragColor = vec4(color, 1.0);
+    }
+  </script>
+  <script src="https://w.soundcloud.com/player/api.js"></script>
+  <script>
+    (() => {
+      'use strict';
+      const canvas = document.querySelector('#gl');
+      const fallback = document.querySelector('#fallback');
+      const gl = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+      if (!gl) { fallback.style.display = 'grid'; document.querySelector('.ui').style.display = 'none'; return; }
+
+      const compile = (type, source) => {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source); gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+        return shader;
+      };
+      try {
+        const program = gl.createProgram();
+        gl.attachShader(program, compile(gl.VERTEX_SHADER, document.querySelector('#vertex').textContent));
+        gl.attachShader(program, compile(gl.FRAGMENT_SHADER, document.querySelector('#fragment').textContent));
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+        gl.useProgram(program);
+
+        const vertices = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+        const position = gl.getAttribLocation(program, 'aPosition');
+        gl.enableVertexAttribArray(position); gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+        const names = ['uResolution','uTime','uSpeed','uGaps','uDiffraction','uBloom','uDispersion','uLampOffset','uGap1Offset','uGap2Offset','uAudioLevel','uBass','uTreble','uBeat','uRhythmPhase','uProgress'];
+        const uniforms = Object.fromEntries(names.map(name => [name, gl.getUniformLocation(program, name)]));
+        const defaults = { speed:2.5, lampAngle:180, gap1Offset:180, gap2Offset:180, gaps:.42, diffraction:2, bloom:2.4, dispersion:.2, scale:1, sensitivity:4 };
+        const values = {...defaults};
+        const format = (key, v) => key === 'speed' ? v.toFixed(2)+'×' : ['lampAngle','gap1Offset','gap2Offset'].includes(key) ? Math.round(v)+'°' : key === 'dispersion' ? v.toFixed(3).replace(/^0/,'') : v.toFixed(2);
+        let cssW = innerWidth, cssH = innerHeight;
+        function resize() {
+          cssW = innerWidth; cssH = innerHeight;
+          const dpr = Math.min(devicePixelRatio || 1, 2) * values.scale;
+          const w = Math.max(1, Math.round(cssW * dpr)), h = Math.max(1, Math.round(cssH * dpr));
+          if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+        }
+        document.querySelectorAll('input[type=range]').forEach(input => {
+          if (Number.isFinite(defaults[input.id])) input.value = defaults[input.id];
+          const sync = () => { values[input.id] = +input.value; input.nextElementSibling.value = format(input.id, values[input.id]); resize(); };
+          input.addEventListener('input', sync); sync();
+        });
+
+        const presetKey = 'bm-fx-001-presets-v1';
+        const builtInPresets = {
+          'Original BM-FX': { speed:.55, lampAngle:0, gap1Offset:0, gap2Offset:0, gaps:.16, diffraction:1.05, bloom:1.2, dispersion:.075, scale:1, sensitivity:1.8 },
+          'Aro Máximo 9:49': { speed:2.5, lampAngle:0, gap1Offset:0, gap2Offset:0, gaps:.42, diffraction:2, bloom:2.4, dispersion:.2, scale:1, sensitivity:2.35 },
+          'Mi configuración permanente': { speed:2.5, lampAngle:180, gap1Offset:180, gap2Offset:180, gaps:.42, diffraction:2, bloom:2.4, dispersion:.2, scale:1, sensitivity:4 }
+        };
+        const presetName = document.querySelector('#presetName');
+        const presetSelect = document.querySelector('#presetSelect');
+
+        let apiPresets = {};
+        const getApiUrl = (path) => {
+          // Si corre en local en navegador, usa ruta relativa. En Android/WebView intenta conectar a localhost:3000 o usa fallback
+          const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
+          const host = isLocal ? window.location.origin : 'http://localhost:3000';
+          return host + path;
+        };
+
+        const readPresets = () => {
+          try {
+            const local = JSON.parse(localStorage.getItem(presetKey) || '{}');
+            return {...builtInPresets, ...local, ...apiPresets};
+          } catch {
+            return {...builtInPresets, ...apiPresets};
+          }
+        };
+
+        const refreshPresets = selected => {
+          const presets = readPresets();
+          presetSelect.innerHTML = '<option value="">Presets guardados</option>';
+          Object.keys(presets).sort((a,b) => a.localeCompare(b)).forEach(name => {
+            const option = document.createElement('option');
+            option.value = option.textContent = name;
+            presetSelect.appendChild(option);
+          });
+          if (selected && presets[selected]) presetSelect.value = selected;
+        };
+
+        const syncPresetsFromServer = async () => {
+          try {
+            const response = await fetch(getApiUrl('/api/presets'));
+            if (response.ok) {
+              apiPresets = await response.json();
+              refreshPresets();
+            }
+          } catch (e) {
+            console.log('API sin conexión, usando almacenamiento local:', e);
+          }
+        };
+
+        const applyPreset = preset => {
+          document.querySelectorAll('input[type=range]').forEach(input => {
+            if (Number.isFinite(preset[input.id])) {
+              input.value = preset[input.id];
+              input.dispatchEvent(new Event('input'));
+            }
+          });
+        };
+
+        document.querySelector('#savePreset').addEventListener('click', async () => {
+          const name = presetName.value.trim() || `Preset ${Object.keys(readPresets()).length + 1}`;
+          const config = Object.fromEntries([...document.querySelectorAll('input[type=range]')].map(input => [input.id, +input.value]));
+
+          try {
+            const local = JSON.parse(localStorage.getItem(presetKey) || '{}');
+            local[name] = config;
+            localStorage.setItem(presetKey, JSON.stringify(local));
+          } catch (e) {}
+
+          presetName.value = '';
+          refreshPresets(name);
+          micStatus.textContent = `Preset “${name}” guardado localmente.`;
+
+          try {
+            const response = await fetch(getApiUrl('/api/presets'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, config })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              apiPresets = data.presets;
+              refreshPresets(name);
+              micStatus.textContent = `Preset “${name}” guardado y sincronizado con el servidor.`;
+            }
+          } catch (e) {
+            console.log('No se pudo guardar en el servidor:', e);
+          }
+        });
+
+        document.querySelector('#loadPreset').addEventListener('click', () => {
+          const preset = readPresets()[presetSelect.value];
+          if (!preset) { micStatus.textContent = 'Selecciona un preset guardado.'; return; }
+          applyPreset(preset);
+          micStatus.textContent = `Preset “${presetSelect.value}” cargado.`;
+        });
+
+        document.querySelector('#deletePreset').addEventListener('click', async () => {
+          const name = presetSelect.value;
+          if (!name) { micStatus.textContent = 'Selecciona el preset que deseas eliminar.'; return; }
+          if (builtInPresets[name]) {
+            micStatus.textContent = `“${name}” es un preset protegido de BM-FX.`;
+            return;
+          }
+
+          try {
+            const local = JSON.parse(localStorage.getItem(presetKey) || '{}');
+            delete local[name];
+            localStorage.setItem(presetKey, JSON.stringify(local));
+          } catch (e) {}
+
+          if (apiPresets[name]) {
+            delete apiPresets[name];
+          }
+
+          refreshPresets();
+          micStatus.textContent = `Preset “${name}” eliminado localmente.`;
+
+          try {
+            const response = await fetch(getApiUrl(`/api/presets/${encodeURIComponent(name)}`), {
+              method: 'DELETE'
+            });
+            if (response.ok) {
+              const data = await response.json();
+              apiPresets = data.presets;
+              refreshPresets();
+              micStatus.textContent = `Preset “${name}” eliminado del servidor.`;
+            }
+          } catch (e) {
+            console.log('No se pudo eliminar en el servidor:', e);
+          }
+        });
+
+        refreshPresets();
+        syncPresetsFromServer();
+
+        addEventListener('resize', resize, {passive:true}); resize();
+
+        const lampSlider = document.querySelector('#lampAngle');
+        const aim = e => {
+          const x = (e.clientX / cssW) * 2 - 1, y = 1 - (e.clientY / cssH) * 2;
+          lampSlider.value = Math.round(Math.atan2(y, x) * 180 / Math.PI);
+          lampSlider.dispatchEvent(new Event('input'));
+        };
+        canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); aim(e); });
+        canvas.addEventListener('pointermove', e => { if (canvas.hasPointerCapture(e.pointerId)) aim(e); });
+        addEventListener('dblclick', () => document.querySelectorAll('input[type=range]').forEach(input => {
+          input.value = defaults[input.id]; input.dispatchEvent(new Event('input'));
+        }));
+
+        const micButton = document.querySelector('#mic');
+        const micStatus = document.querySelector('#micStatus');
+        const meter = document.querySelector('#meter');
+        const artist = document.querySelector('#artist');
+        const soundcloudUrl = document.querySelector('#soundcloudUrl');
+        const trackArtist = document.querySelector('#trackArtist');
+        const trackTitle = document.querySelector('#trackTitle');
+        const trackInput = document.querySelector('#trackInput');
+        const artwork = document.querySelector('#artwork');
+        const soundcloudCredit = document.querySelector('#soundcloudCredit');
+        const watchdogState = document.querySelector('#watchdogState');
+        const playbackModeSelect = document.querySelector('#playbackMode');
+        const soundcloudEditor = document.querySelector('.soundcloud-editor');
+        const scPlayer = document.querySelector('#scPlayer');
+        const scIframe = document.querySelector('#scWidget');
+        const soundcloudKey = 'bm-fx-001-soundcloud-url';
+        const trackKey = 'bm-fx-001-track-title';
+        const playbackModeKey = 'bm-fx-001-playback-mode';
+        trackArtist.textContent = 'IYARI GOMEZ';
+        try {
+          trackInput.value = localStorage.getItem(trackKey) || '';
+          trackTitle.textContent = trackInput.value;
+        } catch {}
+        const updateTrackTitle = () => {
+          const title = trackInput.value.trim();
+          trackTitle.textContent = title;
+          try { localStorage.setItem(trackKey, title); } catch {}
+        };
+        trackInput.addEventListener('input', updateTrackTitle);
+        trackInput.addEventListener('change', () => {
+          updateTrackTitle();
+          micStatus.textContent = trackInput.value.trim()
+            ? `Canción guardada: “${trackInput.value.trim()}”.`
+            : 'Nombre de canción oculto.';
+        });
+        let scWidget = null, currentSoundId = null, soundPoll = null, playbackProgress = 0;
+        let playbackMode = 'independent';
+        const applySound = (sound, source = 'internal') => {
+          if (!sound) return;
+          if (source === 'internal' && playbackMode !== 'independent') return;
+          if (source === 'watchdog' && playbackMode !== 'sync') return;
+          if (Number.isFinite(sound.progress)) playbackProgress = Math.max(0, Math.min(1, sound.progress));
+          const nextSoundId = sound.urn || sound.id || sound.permalink_url || sound.title;
+          if (nextSoundId === currentSoundId) return;
+          currentSoundId = nextSoundId;
+          const creator = String(sound.user?.username || sound.publisher_metadata?.artist || '').trim();
+          const song = String(sound.title || '').trim();
+          trackArtist.textContent = creator || 'IYARI GOMEZ';
+          if (song) {
+            trackInput.value = song;
+            trackTitle.textContent = song;
+            try { localStorage.setItem(trackKey, song); } catch {}
+          }
+          const art = sound.artwork_url || sound.user?.avatar_url || '';
+          if (art) {
+            artwork.src = art.replace('-large.', '-t500x500.');
+            artwork.alt = `Portada de ${song}`;
+          }
+          soundcloudCredit.classList.add('visible');
+          micStatus.textContent = `Reproduciendo “${song}”${creator ? ` de ${creator}` : ''}.`;
+        };
+        const applyPlaybackMode = mode => {
+          playbackMode = mode === 'sync' ? 'sync' : 'independent';
+          playbackModeSelect.value = playbackMode;
+          const sync = playbackMode === 'sync';
+          soundcloudEditor.classList.toggle('sync-mode', sync);
+          scPlayer.classList.toggle('visible', !sync && !!scWidget);
+          if (sync) {
+            soundcloudCredit.textContent = 'SoundCloud · Esperando Watchdog';
+            micStatus.textContent = 'Modo sincronizado: esperando datos de la pestaña externa.';
+          } else {
+            soundcloudCredit.textContent = 'SoundCloud · Reproductor BM-FX';
+            micStatus.textContent = 'Modo independiente: BM-FX controla la reproducción.';
+          }
+          try { localStorage.setItem(playbackModeKey, playbackMode); } catch {}
+        };
+        try { playbackMode = localStorage.getItem(playbackModeKey) || 'independent'; } catch {}
+        playbackModeSelect.addEventListener('change', () => applyPlaybackMode(playbackModeSelect.value));
+        applyPlaybackMode(playbackMode);
+        let watchdogLastSeen = 0;
+        addEventListener('message', event => {
+          if (event.source !== window || event.data?.source !== 'bm-fx-soundcloud-watchdog') return;
+          if (event.data.type === 'STATUS') {
+            watchdogLastSeen = Date.now();
+            watchdogState.textContent = 'WATCHDOG ON · Pestaña externa conectada';
+            watchdogState.classList.add('online');
+            return;
+          }
+          if (event.data?.type !== 'TRACK') return;
+          watchdogLastSeen = Date.now();
+          watchdogState.textContent = 'WATCHDOG ON · Pista externa sincronizada';
+          watchdogState.classList.add('online');
+          const track = event.data.track;
+          if (!track?.title) return;
+          currentSoundId = null;
+          applySound({
+            id: `watchdog:${track.url || ''}:${track.title}`,
+            title: track.title,
+            artwork_url: track.artwork,
+            user: {username: track.artist || ''},
+            permalink_url: track.url,
+            progress: track.progress
+          }, 'watchdog');
+          soundcloudUrl.value = track.url || soundcloudUrl.value;
+          soundcloudCredit.textContent = track.playing === false ? 'SoundCloud · Pausado' : 'SoundCloud · En reproducción';
+          micStatus.textContent = `Watchdog: “${track.title}”${track.artist ? ` de ${track.artist}` : ''}.`;
+        });
+        setInterval(() => {
+          if (watchdogLastSeen && Date.now() - watchdogLastSeen < 5500) return;
+          watchdogState.textContent = 'WATCHDOG OFF · Sin datos de la pestaña externa';
+          watchdogState.classList.remove('online');
+        }, 2000);
+        const connectWidget = url => {
+          if (!window.SC?.Widget) {
+            micStatus.textContent = 'El reproductor de SoundCloud todavía está cargando. Intenta de nuevo.';
+            return;
+          }
+          scPlayer.classList.add('visible');
+          const options = {
+            auto_play: false, color: '#9a69ff', show_artwork: true,
+            show_user: true, show_playcount: false, buying: false, sharing: false, download: false
+          };
+          if (!scWidget) {
+            const params = new URLSearchParams({...options, url});
+            scIframe.src = `https://w.soundcloud.com/player/?${params}`;
+            scWidget = window.SC.Widget(scIframe);
+            const updateCurrent = () => scWidget.getCurrentSound(applySound);
+            const updateAfterTransition = () => {
+              updateCurrent();
+              setTimeout(updateCurrent, 180);
+              setTimeout(updateCurrent, 650);
+            };
+            scWidget.bind(window.SC.Widget.Events.READY, updateAfterTransition);
+            scWidget.bind(window.SC.Widget.Events.PLAY, updateAfterTransition);
+            scWidget.bind(window.SC.Widget.Events.FINISH, updateAfterTransition);
+            scWidget.bind(window.SC.Widget.Events.PLAY_PROGRESS, event => {
+              if (Number.isFinite(event?.relativePosition)) playbackProgress = event.relativePosition;
+            });
+            clearInterval(soundPoll);
+            soundPoll = setInterval(updateCurrent, 1200);
+          } else {
+            currentSoundId = null;
+            scWidget.load(url, {...options, callback: () => scWidget.getCurrentSound(applySound)});
+          }
+        };
+        document.querySelector('#scPrev').addEventListener('click', () => scWidget?.prev());
+        document.querySelector('#scNext').addEventListener('click', () => scWidget?.next());
+        document.querySelector('#scToggle').addEventListener('click', () => scWidget?.toggle());
+        const showSoundCloudTrack = async () => {
+          if (playbackMode !== 'independent') {
+            micStatus.textContent = 'Cambia a modo Independiente para cargar una canción en BM-FX.';
+            return;
+          }
+          const url = soundcloudUrl.value.trim();
+          if (!/^https?:\/\/(www\.)?soundcloud\.com\//i.test(url)) {
+            micStatus.textContent = 'Pega un enlace válido de SoundCloud.';
+            return;
+          }
+          const button = document.querySelector('#loadSoundcloud');
+          button.textContent = 'Cargando…'; button.disabled = true;
+          try {
+            soundcloudCredit.textContent = 'SoundCloud · Reproductor BM-FX';
+            connectWidget(url);
+            const endpoint = `https://soundcloud.com/oembed?format=json&maxwidth=500&url=${encodeURIComponent(url)}`;
+            const response = await fetch(endpoint);
+            if (!response.ok) throw new Error(`SoundCloud respondió ${response.status}`);
+            const data = await response.json();
+            const fullTitle = String(data.title || '').trim();
+            const byIndex = fullTitle.toLowerCase().lastIndexOf(' by ');
+            const song = byIndex > 0 ? fullTitle.slice(0, byIndex) : fullTitle;
+            const creator = String(data.author_name || (byIndex > 0 ? fullTitle.slice(byIndex + 4) : '')).trim();
+            trackArtist.textContent = creator || 'IYARI GOMEZ';
+            trackInput.value = song;
+            trackTitle.textContent = song;
+            if (data.thumbnail_url) {
+              artwork.src = data.thumbnail_url;
+              artwork.alt = `Portada de ${song}`;
+            } else {
+              artwork.removeAttribute('src'); artwork.alt = '';
+            }
+            soundcloudCredit.classList.add('visible');
+            try {
+              localStorage.setItem(soundcloudKey, url);
+              localStorage.setItem(trackKey, song);
+            } catch {}
+            const looksLikeProfile = !song || (creator && song.localeCompare(creator, undefined, {sensitivity:'base'}) === 0);
+            micStatus.textContent = looksLikeProfile
+              ? 'SoundCloud entregó un perfil, no una pista. Escribe la canción o pega el enlace exacto de la canción.'
+              : `Mostrando “${song}”${creator ? ` de ${creator}` : ''}.`;
+          } catch (error) {
+            micStatus.textContent = `No se pudieron leer los datos de SoundCloud: ${error.message}`;
+          } finally {
+            button.textContent = 'Mostrar'; button.disabled = false;
+          }
+        };
+        document.querySelector('#loadSoundcloud').addEventListener('click', showSoundCloudTrack);
+        soundcloudUrl.addEventListener('keydown', event => {
+          if (event.key === 'Enter') showSoundCloudTrack();
+        });
+        try { soundcloudUrl.value = localStorage.getItem(soundcloudKey) || ''; } catch {}
+        let audioContext = null, analyser = null, micStream = null, spectrumData = null;
+        let audioLevel = 0, bass = 0, treble = 0, beat = 0, rhythmPhase = 0;
+        let bassFloor = .08, lastBeatAt = 0;
+        async function stopMic() {
+          if (micStream) micStream.getTracks().forEach(track => track.stop());
+          if (audioContext) await audioContext.close();
+          audioContext = analyser = micStream = spectrumData = null;
+          audioLevel = bass = treble = beat = 0;
+          meter.style.width = '0%'; micButton.dataset.active = 'false';
+          micButton.textContent = 'Activar micrófono';
+          micStatus.textContent = 'Micrófono apagado. El halo continúa en modo procedural.';
+        }
+        micButton.addEventListener('click', async () => {
+          if (micStream) { await stopMic(); return; }
+          if (!navigator.mediaDevices?.getUserMedia) {
+            micStatus.textContent = 'Este navegador no ofrece acceso al micrófono en este contexto.';
+            return;
+          }
+          try {
+            micButton.textContent = 'Conectando…';
+            micStream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            await audioContext.resume();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.78;
+            audioContext.createMediaStreamSource(micStream).connect(analyser);
+            spectrumData = new Uint8Array(analyser.frequencyBinCount);
+            micButton.dataset.active = 'true'; micButton.textContent = 'Micrófono activo · apagar';
+            micStatus.textContent = 'Audio activo: graves pulsan el aro; agudos abren la difracción y el color.';
+          } catch (error) {
+            await stopMic();
+            micStatus.textContent = error.name === 'NotAllowedError'
+              ? 'Permiso de micrófono no concedido. Puedes intentarlo de nuevo.'
+              : 'No se pudo abrir el micrófono: ' + error.message;
+          }
+        });
+        function analyzeAudio() {
+          if (!analyser || !spectrumData) {
+            audioLevel *= .9; bass *= .88; treble *= .88; return;
+          }
+          analyser.getByteFrequencyData(spectrumData);
+          const average = (from, to) => {
+            let sum = 0; const end = Math.min(to, spectrumData.length);
+            for (let i = from; i < end; i++) sum += spectrumData[i];
+            return sum / Math.max(1, end - from) / 255;
+          };
+          const gain = values.sensitivity;
+          const targetBass = Math.min(1, average(1, 18) * gain);
+          const targetTreble = Math.min(1, average(45, 150) * gain * 1.45);
+          const targetLevel = Math.min(1, average(2, 150) * gain * 1.25);
+          const now = performance.now();
+          bassFloor += (targetBass - bassFloor) * .018;
+          const isBeat = targetBass > Math.max(.16, bassFloor * 1.38) && targetBass > bass + .045 && now - lastBeatAt > 170;
+          if (isBeat) {
+            beat = Math.min(1, .58 + targetBass * .72);
+            rhythmPhase += .18 + targetBass * .34;
+            lastBeatAt = now;
+          } else {
+            beat *= .86;
+            rhythmPhase += (.0015 + targetLevel * .006) * values.speed;
+          }
+          bass += (targetBass - bass) * (targetBass > bass ? .38 : .10);
+          treble += (targetTreble - treble) * (targetTreble > treble ? .32 : .12);
+          audioLevel += (targetLevel - audioLevel) * (targetLevel > audioLevel ? .42 : .09);
+          meter.style.width = `${Math.round(audioLevel * 100)}%`;
+          artist.style.setProperty('--audio', audioLevel.toFixed(3));
+          artist.style.setProperty('--treble', treble.toFixed(3));
+        }
+
+        const perf = document.querySelector('#perf');
+        const panel = document.querySelector('.ui');
+        const showPanel = document.querySelector('#showPanel');
+        const setPanelHidden = hidden => {
+          panel.classList.toggle('hidden', hidden);
+          showPanel.classList.toggle('visible', hidden);
+          showPanel.setAttribute('aria-expanded', String(!hidden));
+        };
+        document.querySelector('#hidePanel').addEventListener('click', () => setPanelHidden(true));
+        showPanel.addEventListener('click', () => setPanelHidden(false));
+        addEventListener('keydown', event => {
+          if (event.key.toLowerCase() === 'h' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            setPanelHidden(!panel.classList.contains('hidden'));
+          }
+        });
+        let frames = 0, sampleStart = performance.now(), fps = 0;
+        const start = performance.now();
+        function render(now) {
+          // resize() se llama por eventos de ventana o controles deslizantes
+          analyzeAudio();
+          gl.uniform2f(uniforms.uResolution, canvas.width, canvas.height);
+          gl.uniform1f(uniforms.uTime, (now - start) / 1000);
+          gl.uniform1f(uniforms.uSpeed, values.speed);
+          gl.uniform1f(uniforms.uGaps, values.gaps);
+          gl.uniform1f(uniforms.uDiffraction, values.diffraction);
+          gl.uniform1f(uniforms.uBloom, values.bloom);
+          gl.uniform1f(uniforms.uDispersion, values.dispersion);
+          gl.uniform1f(uniforms.uLampOffset, values.lampAngle * Math.PI / 180);
+          gl.uniform1f(uniforms.uGap1Offset, values.gap1Offset * Math.PI / 180);
+          gl.uniform1f(uniforms.uGap2Offset, values.gap2Offset * Math.PI / 180);
+          gl.uniform1f(uniforms.uAudioLevel, audioLevel);
+          gl.uniform1f(uniforms.uBass, bass);
+          gl.uniform1f(uniforms.uTreble, treble);
+          gl.uniform1f(uniforms.uBeat, beat);
+          gl.uniform1f(uniforms.uRhythmPhase, rhythmPhase);
+          gl.uniform1f(uniforms.uProgress, playbackProgress);
+          gl.drawArrays(gl.TRIANGLES, 0, 6);
+          frames++;
+          if (now - sampleStart >= 500) {
+            fps = frames * 1000 / (now - sampleStart); frames = 0; sampleStart = now;
+            perf.innerHTML = `${fps.toFixed(0)} FPS<br>scale ${values.scale.toFixed(2)} · ${canvas.width}×${canvas.height}`;
+          }
+          requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+      } catch (error) {
+        console.error('BM-FX-001 WebGL init failed:', error);
+        fallback.querySelector('span').textContent = 'El shader no pudo compilarse o enlazarse: ' + error.message;
+        fallback.style.display = 'grid'; document.querySelector('.ui').style.display = 'none';
+      }
+    })();
+  </script>
+</body>
+</html>
