@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlackMamba Mic Rainbow Ring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+    --primary: #ff007f;
+    --primary-glow: rgba(255, 0, 127, 0.5);
+    --bg: #030306;
+    --glass: rgba(12, 12, 20, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text: #f0f0f5;
+    --text-muted: #a0a0b0;
+    --panel-w: 360px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+}
+
+/* Landing Page (Pantalla de inicio) */
+#landing {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, #0f0a1c 0%, #030306 100%);
+    z-index: 100;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 20px;
+}
+
+.card {
+    background: var(--glass);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid var(--glass-border);
+    border-radius: 28px;
+    padding: 50px 40px;
+    max-width: 520px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 50px rgba(255, 0, 127, 0.05);
+    transform: translateY(0);
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 40px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #ff007f 0%, #7f00ff 50%, #00ffff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+}
+
+.card-subtitle {
+    font-size: 11px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 30px;
+}
+
+.card-desc {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin-bottom: 35px;
+    font-weight: 300;
+}
+
+.btn-start {
+    background: linear-gradient(135deg, #ff007f 0%, #7f00ff 100%);
+    border: none;
+    padding: 16px 40px;
+    border-radius: 50px;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    box-shadow: 0 0 30px var(--primary-glow);
+    transition: transform 0.2s, box-shadow 0.3s;
+    outline: none;
+}
+
+.btn-start:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 0 45px rgba(255, 0, 127, 0.7);
+}
+
+.btn-start:active {
+    transform: translateY(1px) scale(0.98);
+}
+
+/* App Layout */
+#app-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+#app-container.ready {
+    opacity: 1;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    transition: filter 0.3s ease;
+}
+
+/* UI Overlay elements */
+.ui-overlay {
+    position: absolute;
+    top: 35px;
+    left: 35px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.brand-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: 3px;
+    background: linear-gradient(90deg, #ff007f, #7f00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.brand-sub {
+    font-size: 9px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* FPS & Info Counter */
+.info-overlay {
+    position: absolute;
+    bottom: 35px;
+    left: 35px;
+    z-index: 10;
+    font-size: 11px;
+    font-family: monospace;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    pointer-events: none;
+    display: flex;
+    gap: 15px;
+}
+
+/* Settings Toggle Button */
+.panel-trigger {
+    position: absolute;
+    top: 35px;
+    right: 35px;
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 120;
+    transition: background 0.3s, transform 0.3s, border-color 0.3s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.panel-trigger:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: rotate(30deg);
+}
+
+.panel-trigger svg {
+    width: 20px;
+    height: 20px;
+    fill: #ffffff;
+    transition: fill 0.3s;
+}
+
+/* Settings Side Panel */
+.settings-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: var(--panel-w);
+    height: 100%;
+    background: rgba(10, 10, 18, 0.75);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-left: 1px solid var(--glass-border);
+    box-shadow: -15px 0 50px rgba(0, 0, 0, 0.7);
+    z-index: 110;
+    transform: translateX(100%);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    padding: 110px 30px 40px 30px;
+}
+
+.settings-panel.open {
+    transform: translateX(0);
+}
+
+.settings-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+/* Scrollbar Customization */
+.settings-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.settings-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.settings-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+.settings-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.panel-section {
+    margin-bottom: 30px;
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 0, 127, 0.15);
+    padding-bottom: 6px;
+}
+
+/* Custom UI Inputs */
+.control-group {
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+}
+
+.control-label-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.control-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--text);
+}
+
+.control-value {
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--text-muted);
+}
+
+/* Sliders */
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 5px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+    transition: background 0.3s;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: var(--primary);
+    box-shadow: 0 0 12px var(--primary-glow);
+}
+
+/* Select */
+select {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.3s, background 0.3s;
+}
+
+select:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 8px rgba(255, 0, 127, 0.25);
+}
+
+/* Toggle Switches */
+.toggle-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider-toggle {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 255, 255, 0.08);
+    transition: .3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.slider-toggle:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #ffffff;
+    transition: .3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input:checked + .slider-toggle {
+    background: linear-gradient(135deg, #ff007f 0%, #7f00ff 100%);
+}
+
+input:checked + .slider-toggle:before {
+    transform: translateX(20px);
+}
+
+/* Reapply audio button */
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s, border-color 0.3s;
+    outline: none;
+    margin-top: 10px;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:active {
+    transform: translateY(1px);
+}
+
+/* Landing active visual styles */
+.hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+</style>
+</head>
+<body>
+
+<!-- SVG Gooey Filter -->
+<svg style="position: absolute; width: 0; height: 0;" width="0" height="0" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="gooey">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
+      <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9" result="goo" />
+      <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+    </filter>
+  </defs>
+</svg>
+
+<!-- Pantalla de Inicio -->
+<div id="landing">
+    <div class="card">
+        <div class="card-title">BlackMamba</div>
+        <div class="card-subtitle">Rainbow Ring Visualizer</div>
+        <div class="card-desc">
+            Experimenta una representación orgánica e interactiva del espectro de tu micrófono.<br>
+            Haz clic abajo para activar el micrófono y sumergirte en la experiencia.
+        </div>
+        <button class="btn-start" id="btn-start">ACTIVAR MICRÓFONO</button>
+    </div>
+</div>
+
+<!-- Contenedor Principal de la App -->
+<div id="app-container">
+    <div class="ui-overlay">
+        <div class="brand-title">BlackMamba</div>
+        <div class="brand-sub">Mic Rainbow Ring v2</div>
+    </div>
+
+    <!-- Trigger Panel -->
+    <div class="panel-trigger" id="panel-toggle">
+        <svg viewBox="0 0 24 24">
+            <path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+        </svg>
+    </div>
+
+    <!-- Side Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+        <div class="settings-scroll">
+            
+            <!-- SECCIÓN: VISUALES -->
+            <div class="panel-section">
+                <div class="section-title">Ajustes Visuales</div>
+                
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="select-mode">Modo Visual</label>
+                    </div>
+                    <select id="select-mode">
+                        <option value="portal" selected>Portal Arcoíris (Anillo)</option>
+                        <option value="gates">Puertas Cósmicas (Doble)</option>
+                        <option value="hyperdrive">Hiperespacio (Líneas)</option>
+                        <option value="nebula">Nebulosa (Portal Líquido)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="select-palette">Tema de Color</label>
+                    </div>
+                    <select id="select-palette">
+                        <option value="rainbow" selected>Arcoíris Completo</option>
+                        <option value="cyberpunk">Cyberpunk Neon</option>
+                        <option value="aurora">Aurora Boreal</option>
+                        <option value="lava">Flujo de Lava</option>
+                        <option value="ice">Glaciar Eléctrico</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="slide-radius">Radio del Anillo</label>
+                        <span class="control-value" id="val-radius">200px</span>
+                    </div>
+                    <input type="range" id="slide-radius" min="100" max="350" value="200">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="slide-lineWidth">Grosor de Línea</label>
+                        <span class="control-value" id="val-lineWidth">5px</span>
+                    </div>
+                    <input type="range" id="slide-lineWidth" min="1" max="15" value="5" step="0.5">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="slide-glow">Intensidad del Brillo</label>
+                        <span class="control-value" id="val-glow">25px</span>
+                    </div>
+                    <input type="range" id="slide-glow" min="0" max="50" value="25">
+                </div>
+
+                <div class="toggle-wrapper">
+                    <span class="control-label">Rotación Automática</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-rotate" checked>
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- SECCIÓN: FÍSICA Y AUDIO -->
+            <div class="panel-section">
+                <div class="section-title">Respuesta y Audio</div>
+
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="slide-sensitivity">Sensibilidad</label>
+                        <span class="control-value" id="val-sensitivity">1.0x</span>
+                    </div>
+                    <input type="range" id="slide-sensitivity" min="0.2" max="3.0" value="1.0" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="slide-smoothing">Suavizado Temporal</label>
+                        <span class="control-value" id="val-smoothing">0.80</span>
+                    </div>
+                    <input type="range" id="slide-smoothing" min="0.5" max="0.98" value="0.80" step="0.02">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label-wrapper">
+                        <label class="control-label" for="slide-spatial">Suavizado Espacial</label>
+                        <span class="control-value" id="val-spatial">4px</span>
+                    </div>
+                    <input type="range" id="slide-spatial" min="0" max="10" value="4">
+                </div>
+            </div>
+
+            <!-- SECCIÓN: EFECTOS DE FONDO -->
+            <div class="panel-section">
+                <div class="section-title">Efectos de Fondo</div>
+
+                <div class="toggle-wrapper">
+                    <span class="control-label">Partículas Activas</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-particles" checked>
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-wrapper">
+                    <span class="control-label">Rejilla de Fondo</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-background" checked>
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- SECCIÓN: CONFIGURACIÓN MICROFÓNO -->
+            <div class="panel-section">
+                <div class="section-title">Ajustes de Captura</div>
+
+                <div class="toggle-wrapper">
+                    <span class="control-label">Supresión de Ruido</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-noise">
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-wrapper">
+                    <span class="control-label">Cancelación de Eco</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-echo">
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-wrapper">
+                    <span class="control-label">Control Automático Ganancia</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-gain">
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+
+                <button class="btn-secondary" id="btn-reinit-audio" style="width: 100%;">RE-INICIAR MICRÓFONO</button>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Info bar overlay -->
+    <div class="info-overlay">
+        <div>FPS: <span id="fps-display">--</span></div>
+        <div>Vol: <span id="vol-display">--</span></div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const startButton = document.getElementById("btn-start");
+const landing = document.getElementById("landing");
+const appContainer = document.getElementById("app-container");
+const panelToggle = document.getElementById("panel-toggle");
+const settingsPanel = document.getElementById("settings-panel");
+
+// Configuración Base de la Aplicación
+const CONFIG = {
+    radius: 200,
+    points: 256, // Número de puntos para definir el anillo
+    lineWidth: 5,
+    glow: 25,
+    maxDisplacement: 140,
+    noiseFloor: 10,
+    smoothing: 0.80,
+    spatialSmoothing: 4,
+    sensitivity: 1.0,
+    palette: 'rainbow',
+    mode: 'portal',
+    showParticles: true,
+    showBackground: true,
+    autoRotate: true,
+    micEcho: false,
+    micNoise: false,
+    micGain: false
+};
+
+// Paletas de Colores Definidas
+const PALETTES = {
+    rainbow: [
+        { stop: 0, color: '#ff0000' },
+        { stop: 0.17, color: '#ff7f00' },
+        { stop: 0.33, color: '#ffff00' },
+        { stop: 0.5, color: '#00ff00' },
+        { stop: 0.67, color: '#0000ff' },
+        { stop: 0.83, color: '#4b0082' },
+        { stop: 1, color: '#ff0000' }
+    ],
+    cyberpunk: [
+        { stop: 0, color: '#ff007f' },
+        { stop: 0.25, color: '#7f00ff' },
+        { stop: 0.5, color: '#00ffff' },
+        { stop: 0.75, color: '#7f00ff' },
+        { stop: 1, color: '#ff007f' }
+    ],
+    aurora: [
+        { stop: 0, color: '#00ff87' },
+        { stop: 0.33, color: '#60efff' },
+        { stop: 0.66, color: '#0061ff' },
+        { stop: 1, color: '#00ff87' }
+    ],
+    lava: [
+        { stop: 0, color: '#ff3300' },
+        { stop: 0.33, color: '#ff8800' },
+        { stop: 0.66, color: '#ffea00' },
+        { stop: 1, color: '#ff3300' }
+    ],
+    ice: [
+        { stop: 0, color: '#00ffff' },
+        { stop: 0.5, color: '#0066ff' },
+        { stop: 1, color: '#00ffff' }
+    ]
+};
+
+// Variables de Audio y Canvas
+let width, height, dpr;
+let audioContext = null;
+let analyser = null;
+let frequencyData = null;
+let microphoneReady = false;
+let currentStream = null;
+
+let rawDisplacements = new Float32Array(CONFIG.points);
+let smoothValues = new Float32Array(CONFIG.points);
+let particles = [];
+let rotationAngle = 0;
+
+// Variables de FPS y Monitoreo
+let lastFrameTime = performance.now();
+let frameCount = 0;
+let fps = 60;
+let averageVolumeVal = 0;
+
+// Función de ajuste de pantalla
+function resize() {
+    dpr = window.devicePixelRatio || 1;
+    width = window.innerWidth;
+    height = window.innerHeight;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+// Alternar panel de configuración
+panelToggle.addEventListener("click", () => {
+    settingsPanel.classList.toggle("open");
+});
+
+// Cerrar panel al hacer clic en el canvas
+canvas.addEventListener("click", () => {
+    settingsPanel.classList.remove("open");
+});
+
+// Sincronizar inputs de UI con CONFIG
+function setupUIListeners() {
+    // Modo
+    const selMode = document.getElementById("select-mode");
+    selMode.addEventListener("change", (e) => {
+        CONFIG.mode = e.target.value;
+        if (CONFIG.mode === 'nebula') {
+            canvas.style.filter = 'url(#gooey)';
+        } else {
+            canvas.style.filter = 'none';
+        }
+    });
+
+    // Paleta
+    const selPalette = document.getElementById("select-palette");
+    selPalette.addEventListener("change", (e) => {
+        CONFIG.palette = e.target.value;
+    });
+
+    // Radio
+    const sRad = document.getElementById("slide-radius");
+    const vRad = document.getElementById("val-radius");
+    sRad.addEventListener("input", (e) => {
+        CONFIG.radius = parseInt(e.target.value);
+        vRad.textContent = CONFIG.radius + "px";
+    });
+
+    // Grosor
+    const sLw = document.getElementById("slide-lineWidth");
+    const vLw = document.getElementById("val-lineWidth");
+    sLw.addEventListener("input", (e) => {
+        CONFIG.lineWidth = parseFloat(e.target.value);
+        vLw.textContent = CONFIG.lineWidth.toFixed(1) + "px";
+    });
+
+    // Glow
+    const sGlow = document.getElementById("slide-glow");
+    const vGlow = document.getElementById("val-glow");
+    sGlow.addEventListener("input", (e) => {
+        CONFIG.glow = parseInt(e.target.value);
+        vGlow.textContent = CONFIG.glow + "px";
+    });
+
+    // Rotación
+    const tRot = document.getElementById("toggle-rotate");
+    tRot.addEventListener("change", (e) => {
+        CONFIG.autoRotate = e.target.checked;
+    });
+
+    // Sensibilidad
+    const sSens = document.getElementById("slide-sensitivity");
+    const vSens = document.getElementById("val-sensitivity");
+    sSens.addEventListener("input", (e) => {
+        CONFIG.sensitivity = parseFloat(e.target.value);
+        vSens.textContent = CONFIG.sensitivity.toFixed(1) + "x";
+    });
+
+    // Suavizado Temporal
+    const sSmooth = document.getElementById("slide-smoothing");
+    const vSmooth = document.getElementById("val-smoothing");
+    sSmooth.addEventListener("input", (e) => {
+        CONFIG.smoothing = parseFloat(e.target.value);
+        vSmooth.textContent = CONFIG.smoothing.toFixed(2);
+        if (analyser) {
+            analyser.smoothingTimeConstant = CONFIG.smoothing * 0.9; // sync con WebAudio
+        }
+    });
+
+    // Suavizado Espacial
+    const sSpatial = document.getElementById("slide-spatial");
+    const vSpatial = document.getElementById("val-spatial");
+    sSpatial.addEventListener("input", (e) => {
+        CONFIG.spatialSmoothing = parseInt(e.target.value);
+        vSpatial.textContent = CONFIG.spatialSmoothing + "px";
+    });
+
+    // Partículas
+    const tPart = document.getElementById("toggle-particles");
+    tPart.addEventListener("change", (e) => {
+        CONFIG.showParticles = e.target.checked;
+        if (!CONFIG.showParticles) particles = []; // vaciar array
+    });
+
+    // Fondo
+    const tBg = document.getElementById("toggle-background");
+    tBg.addEventListener("change", (e) => {
+        CONFIG.showBackground = e.target.checked;
+    });
+
+    // Microfono Toggles
+    const tNoise = document.getElementById("toggle-noise");
+    tNoise.addEventListener("change", (e) => { CONFIG.micNoise = e.target.checked; });
+
+    const tEcho = document.getElementById("toggle-echo");
+    tEcho.addEventListener("change", (e) => { CONFIG.micEcho = e.target.checked; });
+
+    const tGain = document.getElementById("toggle-gain");
+    tGain.addEventListener("change", (e) => { CONFIG.micGain = e.target.checked; });
+
+    // Botón reiniciar micrófono
+    document.getElementById("btn-reinit-audio").addEventListener("click", () => {
+        initAudio(true);
+    });
+}
+
+setupUIListeners();
+
+// Inicialización de la captura del micrófono
+async function initAudio(force = false) {
+    if (audioContext && !force) return;
+
+    microphoneReady = false;
+
+    // Detener tracks anteriores si existen
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+    }
+    if (audioContext) {
+        try {
+            await audioContext.close();
+        } catch(e) {}
+    }
+
+    try {
+        const constraints = {
+            audio: {
+                echoCancellation: CONFIG.micEcho,
+                noiseSuppression: CONFIG.micNoise,
+                autoGainControl: CONFIG.micGain
+            }
+        };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(currentStream);
+
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = CONFIG.smoothing * 0.9;
+
+        source.connect(analyser);
+
+        frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        microphoneReady = true;
+
+        // Ocultar landing y mostrar app
+        landing.classList.add("hidden");
+        appContainer.classList.add("ready");
+    } catch (error) {
+        console.error("Error al acceder al micrófono:", error);
+        alert("No se pudo acceder al micrófono. Asegúrate de dar permisos de micrófono en este navegador o usar un servidor HTTPS/localhost seguro.");
+    }
+}
+
+startButton.addEventListener("click", () => initAudio());
+
+// Helpers de Color para Partículas y Trazados Secundarios
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : { r: 255, g: 255, b: 255 };
+}
+
+function interpolateColor(color1, color2, factor) {
+    const rgb1 = hexToRgb(color1);
+    const rgb2 = hexToRgb(color2);
+    const r = Math.round(rgb1.r + factor * (rgb2.r - rgb1.r));
+    const g = Math.round(rgb1.g + factor * (rgb2.g - rgb1.g));
+    const b = Math.round(rgb1.b + factor * (rgb2.b - rgb1.b));
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Obtener color interpolado en un ratio de 0 a 1
+function getColorAtRatio(ratio) {
+    const stops = PALETTES[CONFIG.palette];
+    let lower = stops[0];
+    let upper = stops[stops.length - 1];
+
+    for (let i = 0; i < stops.length - 1; i++) {
+        if (ratio >= stops[i].stop && ratio <= stops[i+1].stop) {
+            lower = stops[i];
+            upper = stops[i+1];
+            break;
+        }
+    }
+    const diff = upper.stop - lower.stop;
+    const factor = diff === 0 ? 0 : (ratio - lower.stop) / diff;
+    return interpolateColor(lower.color, upper.color, factor);
+}
+
+// Generador de Degradado Cónico
+function getGradient(angleOffset = 0) {
+    try {
+        const cx = width / 2;
+        const cy = height / 2;
+        const grad = ctx.createConicGradient(angleOffset, cx, cy);
+        const stops = PALETTES[CONFIG.palette];
+        stops.forEach(s => {
+            grad.addColorStop(s.stop, s.color);
+        });
+        return grad;
+    } catch (e) {
+        // Fallback robusto a radial en caso de fallo en navegadores antiguos
+        const grad = ctx.createRadialGradient(width/2, height/2, CONFIG.radius*0.8, width/2, height/2, CONFIG.radius*1.2);
+        grad.addColorStop(0, '#ff007f');
+        grad.addColorStop(1, '#00ffff');
+        return grad;
+    }
+}
+
+// Bucle Principal de Animación
+function draw(timestamp) {
+    requestAnimationFrame(draw);
+
+    // Calcular FPS
+    frameCount++;
+    if (timestamp > lastFrameTime + 1000) {
+        fps = Math.round((frameCount * 1000) / (timestamp - lastFrameTime));
+        document.getElementById("fps-display").textContent = fps;
+        frameCount = 0;
+        lastFrameTime = timestamp;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+
+    const cx = width / 2;
+    const cy = height / 2;
+
+    let totalBassVolume = 0;
+    let hasAudio = false;
+
+    // Procesar Audio si el micro está listo
+    if (microphoneReady) {
+        analyser.getByteFrequencyData(frequencyData);
+
+        // Volumen de graves para pulsaciones y efectos (primer 10% del espectro)
+        const bassLimit = Math.floor(frequencyData.length * 0.1);
+        let bassSum = 0;
+        for (let i = 0; i < bassLimit; i++) {
+            bassSum += frequencyData[i];
+        }
+        totalBassVolume = bassSum / bassLimit;
+        
+        // Volumen promedio general para verificar silencio
+        let totalVal = 0;
+        for(let i = 0; i < frequencyData.length; i++){
+            totalVal += frequencyData[i];
+        }
+        averageVolumeVal = totalVal / frequencyData.length;
+        hasAudio = averageVolumeVal > CONFIG.noiseFloor;
+        
+        document.getElementById("vol-display").textContent = Math.round(averageVolumeVal);
+    } else {
+        document.getElementById("vol-display").textContent = "OFF";
+    }
+
+    const normBassVol = Math.min(1, totalBassVolume / 180);
+    const normGeneralVol = Math.min(1, averageVolumeVal / 180);
+
+    // 1. Efecto de Fondo Reactivo
+    if (CONFIG.showBackground) {
+        // Pulsación de luz de fondo
+        const bgGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(width, height) * 0.7);
+        const intensity = 0.05 + normBassVol * 0.15;
+        bgGrad.addColorStop(0, `rgba(30, 20, 50, ${intensity})`);
+        bgGrad.addColorStop(1, 'rgba(3, 3, 6, 1)');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Círculos radiales estáticos de referencia
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.015 + normBassVol * 0.025})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, CONFIG.radius * 0.75, 0, Math.PI * 2);
+        ctx.arc(cx, cy, CONFIG.radius * 1.25, 0, Math.PI * 2);
+        ctx.stroke();
+    } else {
+        ctx.fillStyle = '#030306';
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    // Rotación del espectro
+    if (CONFIG.autoRotate) {
+        rotationAngle += 0.0015 + (normBassVol * 0.005);
+    }
+
+    // 2. Mapear datos de audio a picos radiales
+    for (let i = 0; i < CONFIG.points; i++) {
+        const ratio = i / CONFIG.points;
+
+        // Espectro simétrico en espejo (izquierda y derecha se mueven igual)
+        const symRatio = ratio < 0.5 ? ratio * 2 : (1.0 - ratio) * 2;
+        
+        // Mapeo logarítmico para potenciar respuesta en frecuencias bajas/medias
+        const logRatio = Math.pow(symRatio, 1.35);
+
+        let targetDisp = 0;
+
+        if (microphoneReady && hasAudio) {
+            const maxBin = Math.floor(frequencyData.length * 0.6); // Hasta aprox 14kHz
+            const bin = Math.min(maxBin - 1, Math.floor(logRatio * maxBin));
+            let val = frequencyData[bin];
+
+            val = Math.max(0, val - CONFIG.noiseFloor);
+            targetDisp = (val / 255) * CONFIG.maxDisplacement * CONFIG.sensitivity;
+        }
+
+        // Suavizado temporal
+        rawDisplacements[i] = rawDisplacements[i] * CONFIG.smoothing + targetDisp * (1 - CONFIG.smoothing);
+    }
+
+    // Suavizado espacial (Filtro de media móvil para ondas contiguas)
+    if (CONFIG.spatialSmoothing > 0) {
+        for (let i = 0; i < CONFIG.points; i++) {
+            let sum = 0;
+            let count = 0;
+            const range = CONFIG.spatialSmoothing;
+            for (let j = -range; j <= range; j++) {
+                const idx = (i + j + CONFIG.points) % CONFIG.points;
+                sum += rawDisplacements[idx];
+                count++;
+            }
+            smoothValues[i] = sum / count;
+        }
+    } else {
+        // Copia directa si no hay suavizado espacial
+        for (let i = 0; i < CONFIG.points; i++) {
+            smoothValues[i] = rawDisplacements[i];
+        }
+    }
+
+    // 3. Renderizar Modos Visuales
+    if (CONFIG.mode === 'portal') {
+        // Portal Arcoíris (Anillo único)
+        const pts = [];
+        for (let i = 0; i < CONFIG.points; i++) {
+            const ratio = i / CONFIG.points;
+            const angle = ratio * Math.PI * 2 + rotationAngle;
+            const r = CONFIG.radius + smoothValues[i];
+            pts.push({
+                x: cx + Math.cos(angle) * r,
+                y: cy + Math.sin(angle) * r
+            });
+        }
+
+        const gradient = getGradient(rotationAngle);
+        ctx.strokeStyle = gradient;
+        ctx.lineCap = "round";
+
+        // Trazar trazado cerrado una sola vez
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+            ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+
+        // 1er pase: Glow de fondo
+        if (CONFIG.glow > 0) {
+            ctx.globalAlpha = 0.08;
+            ctx.lineWidth = CONFIG.lineWidth + CONFIG.glow * 1.5;
+            ctx.stroke();
+
+            ctx.globalAlpha = 0.16;
+            ctx.lineWidth = CONFIG.lineWidth + CONFIG.glow * 0.7;
+            ctx.stroke();
+
+            ctx.globalAlpha = 0.28;
+            ctx.lineWidth = CONFIG.lineWidth + CONFIG.glow * 0.3;
+            ctx.stroke();
+        }
+
+        // 2do pase: Anillo nítido superior
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = CONFIG.lineWidth;
+        ctx.stroke();
+
+    } else if (CONFIG.mode === 'gates') {
+        // Puertas Cósmicas (Doble Anillo concéntrico)
+        const ptsOuter = [];
+        const ptsInner = [];
+        
+        for (let i = 0; i < CONFIG.points; i++) {
+            const ratio = i / CONFIG.points;
+            
+            // Anillo exterior gira a la derecha
+            const angleOut = ratio * Math.PI * 2 + rotationAngle;
+            const rOut = CONFIG.radius * 1.15 + smoothValues[i] * 1.1;
+            ptsOuter.push({
+                x: cx + Math.cos(angleOut) * rOut,
+                y: cy + Math.sin(angleOut) * rOut
+            });
+
+            // Anillo interior gira en dirección opuesta
+            const angleIn = ratio * Math.PI * 2 - rotationAngle * 0.8;
+            // El anillo interior usa datos desplazados 180° para variar la forma
+            const idxIn = (i + Math.floor(CONFIG.points / 2)) % CONFIG.points;
+            const rIn = CONFIG.radius * 0.65 - smoothValues[idxIn] * 0.7;
+            ptsInner.push({
+                x: cx + Math.cos(angleIn) * rIn,
+                y: cy + Math.sin(angleIn) * rIn
+            });
+        }
+
+        // Anillo Exterior
+        const gradOut = getGradient(rotationAngle);
+        ctx.strokeStyle = gradOut;
+        ctx.lineCap = "round";
+
+        ctx.beginPath();
+        ctx.moveTo(ptsOuter[0].x, ptsOuter[0].y);
+        for (let i = 1; i < ptsOuter.length; i++) {
+            ctx.lineTo(ptsOuter[i].x, ptsOuter[i].y);
+        }
+        ctx.closePath();
+
+        if (CONFIG.glow > 0) {
+            ctx.globalAlpha = 0.08;
+            ctx.lineWidth = CONFIG.lineWidth * 1.2 + CONFIG.glow * 1.2;
+            ctx.stroke();
+            ctx.globalAlpha = 0.25;
+            ctx.lineWidth = CONFIG.lineWidth * 1.2 + CONFIG.glow * 0.3;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = CONFIG.lineWidth * 1.2;
+        ctx.stroke();
+
+        // Anillo Interior (más delgado)
+        const gradIn = getGradient(-rotationAngle * 0.8);
+        ctx.strokeStyle = gradIn;
+
+        ctx.beginPath();
+        ctx.moveTo(ptsInner[0].x, ptsInner[0].y);
+        for (let i = 1; i < ptsInner.length; i++) {
+            ctx.lineTo(ptsInner[i].x, ptsInner[i].y);
+        }
+        ctx.closePath();
+
+        if (CONFIG.glow > 0) {
+            ctx.globalAlpha = 0.08;
+            ctx.lineWidth = CONFIG.lineWidth * 0.7 + CONFIG.glow * 0.8;
+            ctx.stroke();
+            ctx.globalAlpha = 0.25;
+            ctx.lineWidth = CONFIG.lineWidth * 0.7 + CONFIG.glow * 0.2;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = CONFIG.lineWidth * 0.7;
+        ctx.stroke();
+
+    } else if (CONFIG.mode === 'hyperdrive') {
+        // Hiperespacio (Líneas radiales masivas - Todo dibujado en un solo trazado)
+        ctx.beginPath();
+        const skip = 2; // Dibujar cada 2 puntos para un efecto estriado más limpio
+        
+        for (let i = 0; i < CONFIG.points; i += skip) {
+            const ratio = i / CONFIG.points;
+            const angle = ratio * Math.PI * 2 + rotationAngle;
+            
+            const rInner = CONFIG.radius * 0.75;
+            const rOuter = rInner + smoothValues[i] * 1.35;
+
+            const x1 = cx + Math.cos(angle) * rInner;
+            const y1 = cy + Math.sin(angle) * rInner;
+            const x2 = cx + Math.cos(angle) * rOuter;
+            const y2 = cy + Math.sin(angle) * rOuter;
+
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+        }
+
+        const gradient = getGradient(rotationAngle);
+        ctx.strokeStyle = gradient;
+        ctx.lineCap = "round";
+
+        // Glow radial
+        if (CONFIG.glow > 0) {
+            ctx.globalAlpha = 0.08;
+            ctx.lineWidth = CONFIG.lineWidth * 1.5 + CONFIG.glow * 1.0;
+            ctx.stroke();
+            
+            ctx.globalAlpha = 0.25;
+            ctx.lineWidth = CONFIG.lineWidth * 1.5 + CONFIG.glow * 0.3;
+            ctx.stroke();
+        }
+
+        // Trazado nítido
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = CONFIG.lineWidth * 1.3;
+        ctx.stroke();
+
+    } else if (CONFIG.mode === 'nebula') {
+        // Portal Líquido / Nebulosa (Círculo relleno wobbly con filtro gooey)
+        const pts = [];
+        for (let i = 0; i < CONFIG.points; i++) {
+            const ratio = i / CONFIG.points;
+            const angle = ratio * Math.PI * 2 + rotationAngle;
+            const r = CONFIG.radius * 0.95 + smoothValues[i] * 0.95;
+            pts.push({
+                x: cx + Math.cos(angle) * r,
+                y: cy + Math.sin(angle) * r
+            });
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+            ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+
+        // Rellenar con un gradiente interno espectacular
+        const innerGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, CONFIG.radius * 1.4);
+        
+        // Adaptar color del núcleo relleno a la paleta seleccionada
+        let coreColor1 = 'rgba(25, 10, 45, 0.9)';
+        let coreColor2 = 'rgba(10, 5, 20, 0.4)';
+        
+        if (CONFIG.palette === 'lava') {
+            coreColor1 = 'rgba(60, 15, 5, 0.9)';
+            coreColor2 = 'rgba(30, 5, 0, 0.4)';
+        } else if (CONFIG.palette === 'aurora') {
+            coreColor1 = 'rgba(5, 40, 25, 0.9)';
+            coreColor2 = 'rgba(0, 15, 10, 0.4)';
+        } else if (CONFIG.palette === 'ice') {
+            coreColor1 = 'rgba(5, 30, 55, 0.9)';
+            coreColor2 = 'rgba(0, 10, 25, 0.4)';
+        } else if (CONFIG.palette === 'cyberpunk') {
+            coreColor1 = 'rgba(40, 5, 45, 0.9)';
+            coreColor2 = 'rgba(20, 0, 25, 0.4)';
+        }
+
+        innerGrad.addColorStop(0, coreColor1);
+        innerGrad.addColorStop(0.65, coreColor2);
+        innerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.fillStyle = innerGrad;
+        ctx.fill();
+
+        // Contorno de la nebulosa
+        const gradient = getGradient(rotationAngle);
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = CONFIG.lineWidth * 1.8;
+        ctx.stroke();
+    }
+
+    // 4. Sistema de Partículas Reactivas
+    if (microphoneReady && CONFIG.showParticles && hasAudio) {
+        // Emitir partículas basadas en el volumen general
+        const emitCount = Math.floor(normGeneralVol * 7);
+        for (let k = 0; k < emitCount; k++) {
+            // Emisión de partículas desde puntos aleatorios activos del anillo
+            const idx = Math.floor(Math.random() * CONFIG.points);
+            const disp = smoothValues[idx];
+            
+            // Solo emitir si hay respuesta (desplazamiento) en ese punto
+            if (disp > 3) {
+                const ratio = idx / CONFIG.points;
+                const angle = ratio * Math.PI * 2 + rotationAngle;
+                
+                // Radio del que nace la partícula
+                let baseR = CONFIG.radius + disp;
+                if (CONFIG.mode === 'gates') {
+                    // Emitir mitad exterior, mitad interior
+                    baseR = Math.random() > 0.5 ? CONFIG.radius * 1.15 + disp : CONFIG.radius * 0.65 - disp;
+                } else if (CONFIG.mode === 'hyperdrive') {
+                    baseR = CONFIG.radius * 0.75 + disp;
+                } else if (CONFIG.mode === 'nebula') {
+                    baseR = CONFIG.radius * 0.95 + disp;
+                }
+
+                const px = cx + Math.cos(angle) * baseR;
+                const py = cy + Math.sin(angle) * baseR;
+
+                // Velocidad proyectada hacia afuera
+                const speed = 0.5 + Math.random() * 1.5 + normGeneralVol * 3.5;
+                const vx = Math.cos(angle) * speed + (Math.random() - 0.5) * 0.6;
+                const vy = Math.sin(angle) * speed + (Math.random() - 0.5) * 0.6;
+
+                particles.push({
+                    x: px,
+                    y: py,
+                    vx: vx,
+                    vy: vy,
+                    size: 1.0 + Math.random() * 2.8,
+                    color: getColorAtRatio(ratio),
+                    life: 1.0,
+                    decay: 0.012 + Math.random() * 0.02
+                });
+            }
+        }
+    }
+
+    // Limitar total de partículas por rendimiento (tope de 300)
+    if (particles.length > 300) {
+        particles.splice(0, particles.length - 300);
+    }
+
+    // Actualizar y Pintar Partículas
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= p.decay;
+
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+        }
+
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.beginPath();
+        // Círculos pequeños rellenos (rápido sin shadowBlur)
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Resetear opacidad
+    ctx.globalAlpha = 1.0;
+}
+
+// Arrancar el ciclo de dibujo
+draw(performance.now());
+</script>
+
+</body>
+</html>
