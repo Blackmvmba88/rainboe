@@ -358,10 +358,24 @@
         };
         const presetName = document.querySelector('#presetName');
         const presetSelect = document.querySelector('#presetSelect');
-        const readPresets = () => {
-          try { return {...builtInPresets, ...JSON.parse(localStorage.getItem(presetKey) || '{}')}; }
-          catch { return {...builtInPresets}; }
+
+        let apiPresets = {};
+        const getApiUrl = (path) => {
+          // Si corre en local en navegador, usa ruta relativa. En Android/WebView intenta conectar a localhost:3000 o usa fallback
+          const isLocal = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
+          const host = isLocal ? window.location.origin : 'http://localhost:3000';
+          return host + path;
         };
+
+        const readPresets = () => {
+          try {
+            const local = JSON.parse(localStorage.getItem(presetKey) || '{}');
+            return {...builtInPresets, ...local, ...apiPresets};
+          } catch {
+            return {...builtInPresets, ...apiPresets};
+          }
+        };
+
         const refreshPresets = selected => {
           const presets = readPresets();
           presetSelect.innerHTML = '<option value="">Presets guardados</option>';
@@ -372,6 +386,19 @@
           });
           if (selected && presets[selected]) presetSelect.value = selected;
         };
+
+        const syncPresetsFromServer = async () => {
+          try {
+            const response = await fetch(getApiUrl('/api/presets'));
+            if (response.ok) {
+              apiPresets = await response.json();
+              refreshPresets();
+            }
+          } catch (e) {
+            console.log('API sin conexión, usando almacenamiento local:', e);
+          }
+        };
+
         const applyPreset = preset => {
           document.querySelectorAll('input[type=range]').forEach(input => {
             if (Number.isFinite(preset[input.id])) {
@@ -380,33 +407,83 @@
             }
           });
         };
-        document.querySelector('#savePreset').addEventListener('click', () => {
+
+        document.querySelector('#savePreset').addEventListener('click', async () => {
           const name = presetName.value.trim() || `Preset ${Object.keys(readPresets()).length + 1}`;
-          const presets = readPresets();
-          presets[name] = Object.fromEntries([...document.querySelectorAll('input[type=range]')].map(input => [input.id, +input.value]));
-          localStorage.setItem(presetKey, JSON.stringify(presets));
-          presetName.value = ''; refreshPresets(name);
-          micStatus.textContent = `Preset “${name}” guardado en este navegador.`;
+          const config = Object.fromEntries([...document.querySelectorAll('input[type=range]')].map(input => [input.id, +input.value]));
+
+          try {
+            const local = JSON.parse(localStorage.getItem(presetKey) || '{}');
+            local[name] = config;
+            localStorage.setItem(presetKey, JSON.stringify(local));
+          } catch (e) {}
+
+          presetName.value = '';
+          refreshPresets(name);
+          micStatus.textContent = `Preset “${name}” guardado localmente.`;
+
+          try {
+            const response = await fetch(getApiUrl('/api/presets'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, config })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              apiPresets = data.presets;
+              refreshPresets(name);
+              micStatus.textContent = `Preset “${name}” guardado y sincronizado con el servidor.`;
+            }
+          } catch (e) {
+            console.log('No se pudo guardar en el servidor:', e);
+          }
         });
+
         document.querySelector('#loadPreset').addEventListener('click', () => {
           const preset = readPresets()[presetSelect.value];
           if (!preset) { micStatus.textContent = 'Selecciona un preset guardado.'; return; }
           applyPreset(preset);
           micStatus.textContent = `Preset “${presetSelect.value}” cargado.`;
         });
-        document.querySelector('#deletePreset').addEventListener('click', () => {
+
+        document.querySelector('#deletePreset').addEventListener('click', async () => {
           const name = presetSelect.value;
           if (!name) { micStatus.textContent = 'Selecciona el preset que deseas eliminar.'; return; }
           if (builtInPresets[name]) {
             micStatus.textContent = `“${name}” es un preset protegido de BM-FX.`;
             return;
           }
-          const presets = readPresets(); delete presets[name];
-          Object.keys(builtInPresets).forEach(key => delete presets[key]);
-          localStorage.setItem(presetKey, JSON.stringify(presets));
-          refreshPresets(); micStatus.textContent = `Preset “${name}” eliminado.`;
+
+          try {
+            const local = JSON.parse(localStorage.getItem(presetKey) || '{}');
+            delete local[name];
+            localStorage.setItem(presetKey, JSON.stringify(local));
+          } catch (e) {}
+
+          if (apiPresets[name]) {
+            delete apiPresets[name];
+          }
+
+          refreshPresets();
+          micStatus.textContent = `Preset “${name}” eliminado localmente.`;
+
+          try {
+            const response = await fetch(getApiUrl(`/api/presets/${encodeURIComponent(name)}`), {
+              method: 'DELETE'
+            });
+            if (response.ok) {
+              const data = await response.json();
+              apiPresets = data.presets;
+              refreshPresets();
+              micStatus.textContent = `Preset “${name}” eliminado del servidor.`;
+            }
+          } catch (e) {
+            console.log('No se pudo eliminar en el servidor:', e);
+          }
         });
+
         refreshPresets();
+        syncPresetsFromServer();
 
         addEventListener('resize', resize, {passive:true}); resize();
 
