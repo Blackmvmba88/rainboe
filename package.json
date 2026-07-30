@@ -3,8 +3,14 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "bin": {
+    "bm-fx": "./cli.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node cli.js start",
+    "build": "node cli.js build",
+    "android:build": "node cli.js android:build",
+    "android:run": "node cli.js android:run"
   },
   "keywords": [],
   "author": "",
